@@ -1,26 +1,17 @@
 extends Node
 
-# Autoload named Lobby
-
-# These signals can be connected to by a UI lobby scene or the game scene.
 signal player_connected(peer_id, player_info)
 signal player_disconnected(peer_id)
 signal server_disconnected
 
 const PORT = 2244
-const DEFAULT_SERVER_IP = "localhost" # IPv4 localhost
+const DEFAULT_SERVER_IP = "localhost"
 const MAX_CONNECTIONS = 1000
 
-# This will contain player info for every player,
-# with the keys being each player's unique IDs.
 var players = {}
 var public_lobbies = {}
 var private_lobbies = {}
 
-# This is the local player info. This should be modified locally
-# before the connection is made. It will be passed to every other peer.
-# For example, the value of "name" can be set to something the player
-# entered in a UI scene.
 var player_info = {"name": "Name"}
 var characters = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
 var join_code_chars = 'qwertyuiopasdfghjklzxcvbnm'
@@ -57,13 +48,10 @@ func request_lobby_list():
 func remove_multiplayer_peer():
 	multiplayer.multiplayer_peer = null
 
-# Every peer will call this when they have loaded the game scene.
 func player_loaded():
 	if multiplayer.is_server():
 		players_loaded += 1
 
-# When a peer connects, send them my player info.
-# This allows transfer of all desired data for each player, not only the unique ID.
 func _on_player_connected(id):
 	_register_player.rpc_id(id, player_info)
 
@@ -116,9 +104,21 @@ func close_lobby(id):
 	public_lobbies.erase(id)
 	private_lobbies.erase(id)
 	print("ERASED LOBBY %s" % id)
-	
+
+@rpc("any_peer", "reliable")
+func create_new_multiplayer_user(username : String, signature : PackedByteArray):
+	var success = AuthManager._InsertNewUser(username, signature)
+	if success:
+		user_creation_status.rpc(true)
+	else:
+		user_creation_status.rpc(false)
+
+# GHOST FUNCTIONS
 @rpc("any_peer")
 func recieve_lobby_list(): pass
 
 @rpc("any_peer")
 func recieve_lobby_id(): pass
+
+@rpc("any_peer")
+func user_creation_status(return_value: bool): pass

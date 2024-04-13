@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+AuthManager="*res://scripts/AuthManager.gd"
 MultiplayerManager="*res://scripts/MultiplayerManager.gd"
 
 [editor]
