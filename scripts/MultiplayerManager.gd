@@ -5,6 +5,8 @@ signal playerDisconnected(peer_id)
 signal serverDisconnected
 signal providedUsername(username)
 
+const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
+
 var players = {}
 var publicLobbies = {}
 var privateLobbies = {}
@@ -13,6 +15,7 @@ var playersLoaded = 0
 var playerInfo = {"name": "Name"}
 var lobbyIdChars = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
 var joinCodeChars = 'qwertyuiopasdfghjklzxcvbnm'
+var multiplayerRoundManager
 
 func _ready():
 	multiplayer.peer_connected.connect(_onPlayerConnected)
@@ -25,6 +28,10 @@ func _ready():
 func _createServer():
 	var multiplayerPeer = ENetMultiplayerPeer.new()
 	var error = multiplayerPeer.create_server(2244, 1000)
+	multiplayerRoundManager = MultiplayerRoundManager.new()
+	multiplayerRoundManager.name = "multiplayer round manager"
+	add_child(multiplayerRoundManager)
+	
 	if error:
 		return error
 	multiplayer.multiplayer_peer = multiplayerPeer

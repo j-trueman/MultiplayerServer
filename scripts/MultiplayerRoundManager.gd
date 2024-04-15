@@ -104,8 +104,7 @@ func pickItems():
 	sendItems.rpc(itemsForPlayers)
 
 @rpc("any_peer")
-func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount):
-	pass
+func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pass
 
 @rpc("any_peer")
 func sendItems(itemsForPlayers): pass
@@ -194,7 +193,7 @@ func recieveActionValidation(action):
 	if roundOver:
 		scores[winner] += 1
 		roundIdx += 1
-		if scores.max() > 1 or roundIdx == 3:
+		if scores.max() > 1 or roundIdx > 2:
 			pass	# ending stuff
 		else:
 			beginRound()
