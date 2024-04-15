@@ -1,88 +1,83 @@
 extends Node
 
-signal player_connected(peer_id, player_info)
-signal player_disconnected(peer_id)
-signal server_disconnected
-
-const PORT = 2244
-const DEFAULT_SERVER_IP = "localhost"
-const MAX_CONNECTIONS = 1000
+signal playerConnected(peer_id, player_info)
+signal playerDisconnected(peer_id)
+signal serverDisconnected
+signal providedUsername(username)
 
 var players = {}
-var public_lobbies = {}
-var private_lobbies = {}
+var publicLobbies = {}
+var privateLobbies = {}
+var playersLoaded = 0
 
-var player_info = {"name": "Name"}
-var characters = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
-var join_code_chars = 'qwertyuiopasdfghjklzxcvbnm'
-var players_loaded = 0
-
-var loggedInPlayerIds = {}
+var playerInfo = {"name": "Name"}
+var lobbyIdChars = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
+var joinCodeChars = 'qwertyuiopasdfghjklzxcvbnm'
 
 func _ready():
-	multiplayer.peer_connected.connect(_on_player_connected)
-	multiplayer.peer_disconnected.connect(_on_player_disconnected)
-	multiplayer.connected_to_server.connect(_on_connected_ok)
-	multiplayer.connection_failed.connect(_on_connected_fail)
-	multiplayer.server_disconnected.connect(_on_server_disconnected)
-	create_game()
+	multiplayer.peer_connected.connect(_onPlayerConnected)
+	multiplayer.peer_disconnected.connect(_onPlayerDisconnected)
+	multiplayer.connected_to_server.connect(_onPlayerConnectedOk)
+	multiplayer.connection_failed.connect(_onConnectionFail)
+	multiplayer.server_disconnected.connect(_onServerDisconnected)
+	_createServer()
 
-func create_game():
-	var peer = ENetMultiplayerPeer.new()
-	var error = peer.create_server(PORT, MAX_CONNECTIONS)
+func _createServer():
+	var multiplayerPeer = ENetMultiplayerPeer.new()
+	var error = multiplayerPeer.create_server(2244, 1000)
 	if error:
 		return error
-	multiplayer.multiplayer_peer = peer
+	multiplayer.multiplayer_peer = multiplayerPeer
 	print("CREATED SERVER")
 
 @rpc("any_peer")
-func request_lobby_list():
-	recieve_lobby_list.rpc(public_lobbies)
+func requestLobbyList():
+	recieveLobbyList.rpc(publicLobbies)
 
-func remove_multiplayer_peer():
+func _removeMultiplayerPeer():
 	multiplayer.multiplayer_peer = null
 
-func player_loaded():
+func _playerLoaded():
 	if multiplayer.is_server():
-		players_loaded += 1
+		playersLoaded += 1
 
-func _on_player_connected(id):
-	_register_player.rpc_id(id, player_info)
+func _onPlayerConnected(id):
+	registerPlayer.rpc_id(id, playerInfo)
 
 @rpc("any_peer", "reliable")
-func _register_player(new_player_info):
-	var new_player_id = multiplayer.get_remote_sender_id()
-	players[new_player_id] = new_player_info
-	player_connected.emit(new_player_id, new_player_info)
-	print("Player %s connected" % new_player_id)
-	player_loaded()
+func registerPlayer(newPlayerInfo):
+	var newPlayerId = multiplayer.get_remote_sender_id()
+	players[newPlayerId] = newPlayerInfo
+	playerConnected.emit(newPlayerId, newPlayerInfo)
+	print("Player %s connected" % newPlayerId)
+	_playerLoaded()
 
-func _on_player_disconnected(id):
+func _onPlayerDisconnected(id):
 	players.erase(id)
-	player_disconnected.emit(id)
+	playerDisconnected.emit(id)
 
-func _on_connected_ok():
-	var peer_id = multiplayer.get_unique_id()
-	players[peer_id] = player_info
-	player_connected.emit(peer_id, player_info)
+func _onPlayerConnectedOk():
+	var peerId = multiplayer.get_unique_id()
+	players[peerId] = playerInfo
+	playerConnected.emit(peerId, playerInfo)
 
-func _on_connected_fail():
+func _onConnectionFail():
 	multiplayer.multiplayer_peer = null
 
-func _on_server_disconnected():
+func _onServerDisconnected():
 	multiplayer.multiplayer_peer = null
 	players.clear()
-	server_disconnected.emit()
+	serverDisconnected.emit()
 	
 @rpc("any_peer", "reliable")
 func create_lobby(max_players, turn_type, lobby_type):
-	var lobby_id = generate_ID(characters, 20)
-	var lobby_join_code = generate_ID(join_code_chars, 5)
+	var lobby_id = generate_ID(lobbyIdChars, 20)
+	var lobby_join_code = generate_ID(joinCodeChars, 5)
 	var lobby_info = {"host" : multiplayer.get_remote_sender_id(), "players" : [multiplayer.get_remote_sender_id()], "max players" : max_players, "turn type": turn_type, "lobby_type" : lobby_type, "join_code" : lobby_join_code}
 	if lobby_type == "public":
-		public_lobbies[lobby_id] = lobby_info
+		publicLobbies[lobby_id] = lobby_info
 	else:
-		private_lobbies[lobby_id] = lobby_info
+		privateLobbies[lobby_id] = lobby_info
 	print("CREATED NEW %s LOBBY %s:\n\t%s" % [lobby_info["lobby_type"],lobby_id, lobby_info])
 	recieve_lobby_id.rpc(lobby_id)
 	
@@ -94,18 +89,25 @@ func generate_ID(chars, length):
 	return word
 	
 @rpc("any_peer")
-func close_lobby(id):
-	public_lobbies.erase(id)
-	private_lobbies.erase(id)
-	print("ERASED LOBBY %s" % id)
+func closeLobby(id):
+	var authenticatedUsername = await verifyUserId(multiplayer.get_remote_sender_id())
+	if !authenticatedUsername:
+		return false
+	publicLobbies.erase(id)
+	privateLobbies.erase(id)
+	print("%s CLOSED LOBBY %s" % [authenticatedUsername,id])
 
 @rpc("any_peer", "reliable")
-func create_new_multiplayer_user(username : String, signature : PackedByteArray):
-	var success = AuthManager._InsertNewUser(username, signature)
+func createNewMultiplayerUser(username : String):
+	var signatureAndKey = AuthManager._generateUserCredentials()
+	var success = AuthManager._InsertNewUser(username, signatureAndKey[0])
 	if success:
-		user_creation_status.rpc(true)
+		recieveUserCreationStatus.rpc(true)
+		AuthManager._loginToUserAccount(username)
+		notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
+		recieveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
 	else:
-		user_creation_status.rpc(false)
+		recieveUserCreationStatus.rpc(false)
 
 @rpc("any_peer")
 func verifyUserCreds(username : String, key):
@@ -120,15 +122,28 @@ func verifyUserCreds(username : String, key):
 	AuthManager._loginToUserAccount(username)
 	notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
 
+func verifyUserId(id : int):
+	requestSenderUsername.rpc_id(id)
+	var username = await providedUsername
+	var usernameInDatabase = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(id)]
+	if usernameInDatabase == username:
+		return username
+	return false
+
 func terminateSession(id, reason : String):
 	closeSession.rpc_id(id, reason)
 
+@rpc("any_peer") func recieveSenderUsername(username): 
+	providedUsername.emit(username)
+
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
-@rpc("any_peer") func recieve_lobby_list(): pass
+@rpc("any_peer") func recieveLobbyList(): pass
 @rpc("any_peer") func recieve_lobby_id(): pass
-@rpc("any_peer") func user_creation_status(return_value: bool): pass
+@rpc("any_peer") func recieveUserCreationStatus(return_value: bool): pass
 @rpc("authority") func notifySuccessfulLogin(): pass
+@rpc("any_peer") func requestSenderUsername(): pass
+@rpc("authority") func recieveUserKey(keyString): pass 
 
 # DEBUG INPUTS
 func _input(ev):

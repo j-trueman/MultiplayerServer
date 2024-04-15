@@ -3,13 +3,12 @@ extends Node
 var database : SQLite
 var loggedInPlayerIds = {}
 var crypto = Crypto.new()
-var keyToUse = CryptoKey.new()
 var data = "multiplayersignature"
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	database = SQLite.new()
-	database.path = "user://authsignatures.db"
+	database.path = "res://authsignatures.db"
 	database.open_db()
 	var result = database.query("SELECT * FROM users WHERE 0")
 	if result:
@@ -22,9 +21,12 @@ func _ready():
 		}
 		database.create_table("users", table)
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
-	pass
+func _generateUserCredentials():
+	var privateKey = CryptoKey.new()
+	privateKey = crypto.generate_rsa(4096)
+	var signature = crypto.sign(HashingContext.HASH_SHA256, data.sha256_buffer(), privateKey)
+	var keyAsString = privateKey.save_to_string()
+	return [signature,keyAsString]
 
 func _InsertNewUser(username : String, signature : PackedByteArray) -> bool:
 	username = username.to_lower()
@@ -48,6 +50,7 @@ func _getUserSignature(username : String):
 	return signature[0].get("signature", PackedByteArray())
 	
 func _verifyUserSignature(signature : PackedByteArray, key):
+	var keyToUse = CryptoKey.new()
 	keyToUse.load_from_string(key)
 	var verified = crypto.verify(HashingContext.HASH_SHA256, data.sha256_buffer(), signature, keyToUse)
 	if !verified:
