@@ -17,6 +17,8 @@ var characters = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
 var join_code_chars = 'qwertyuiopasdfghjklzxcvbnm'
 var players_loaded = 0
 
+var loggedInPlayerIds = {}
+
 func _ready():
 	multiplayer.peer_connected.connect(_on_player_connected)
 	multiplayer.peer_disconnected.connect(_on_player_disconnected)
@@ -24,14 +26,6 @@ func _ready():
 	multiplayer.connection_failed.connect(_on_connected_fail)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	create_game()
-
-func _input(ev):
-	if Input.is_key_pressed(KEY_N):
-		print("CURRENT PLAYERS LOADED: %s" % players_loaded)
-	if Input.is_key_pressed(KEY_P):
-		print("PLAYERS CONNECTED:")
-		for entry in players:
-			print("\t%s" % str(entry))
 
 func create_game():
 	var peer = ENetMultiplayerPeer.new()
@@ -113,12 +107,30 @@ func create_new_multiplayer_user(username : String, signature : PackedByteArray)
 	else:
 		user_creation_status.rpc(false)
 
+@rpc("any_peer")
+func verifyUserCreds(username : String, key):
+	var signature = AuthManager._getUserSignature(username)
+	if !signature:
+		terminateSession(multiplayer.get_remote_sender_id(), "User does not exist")
+		return false
+	var credsAreCorrect = AuthManager._verifyUserSignature(signature, key)
+	if !credsAreCorrect:
+		terminateSession(multiplayer.get_remote_sender_id(), "Incorrect Credentials")
+		return false
+	AuthManager._loginToUserAccount(username)
+	notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
+
+func terminateSession(id, reason : String):
+	closeSession.rpc_id(id, reason)
+
 # GHOST FUNCTIONS
-@rpc("any_peer")
-func recieve_lobby_list(): pass
+@rpc("any_peer") func closeSession(reason): pass
+@rpc("any_peer") func recieve_lobby_list(): pass
+@rpc("any_peer") func recieve_lobby_id(): pass
+@rpc("any_peer") func user_creation_status(return_value: bool): pass
+@rpc("authority") func notifySuccessfulLogin(): pass
 
-@rpc("any_peer")
-func recieve_lobby_id(): pass
-
-@rpc("any_peer")
-func user_creation_status(return_value: bool): pass
+# DEBUG INPUTS
+func _input(ev):
+	if Input.is_key_pressed(KEY_L):
+		print(str(AuthManager.loggedInPlayerIds))
