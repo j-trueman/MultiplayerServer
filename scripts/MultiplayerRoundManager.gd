@@ -26,7 +26,10 @@ var scores
 var currentPlayerTurn
 var matchStarter
 var roundIdx
+var loadIdx
 var shellArray
+var totalShells
+var liveCount
 var health
 var healthPlayers
 var numItems
@@ -52,9 +55,26 @@ func _process(delta):
 				stealGrace = false
 				stealTimer = 0.0
 
+@rpc("any_peer")
+func receiveJoinMatch(playerName):
+	print("ReceiveJoinMatch: " + playerName)
+	match players.size():
+		0: 
+			sendJoinMatch.rpc(true)
+			players.append({multiplayer.get_remote_sender_id() : playerName})
+		1:
+			sendJoinMatch.rpc(true)
+			players.append({multiplayer.get_remote_sender_id() : playerName})
+			beginMatch()
+		2:
+			sendJoinMatch(false)
+	
+@rpc("any_peer")
+func sendJoinMatch(success): print("SendJoinMatch: " + str(success))
+
 func beginMatch():
+	players.shuffle()
 	scores = []
-	matchStarter = randi_range(0,1)
 	roundIdx = 0
 	mode = 1
 	beginRound()
@@ -62,9 +82,10 @@ func beginMatch():
 func beginRound():
 	itemsOnTable = [[],[]]
 	itemAmounts_available = [itemAmounts, itemAmounts]
+	loadIdx = 0
 	
 	match roundIdx:
-		0: currentPlayerTurn = matchStarter
+		0: currentPlayerTurn = players.front()
 		1: currentPlayerTurn = int(not matchStarter)
 		2: currentPlayerTurn = randi_range(0,1)
 	
@@ -76,15 +97,14 @@ func beginLoad():
 	shellArray = []
 	isHandcuffed = [0, 0]
 	
-	var totalShells = randi_range(minShells, maxShells)
-	var liveCount = floori(float(totalShells) * percentageShells)
+	totalShells = randi_range(minShells, maxShells)
+	liveCount = floori(float(totalShells) * percentageShells)
 	for i in range(0, totalShells):
 		if i < liveCount:
 			shellArray.append(1)
 		else:
 			shellArray.append(0)
 	shellArray.shuffle()
-	sendLoadInfo.rpc(currentPlayerTurn, healthPlayers, totalShells, liveCount)	
 	pickItems()
 
 func pickItems():
@@ -104,15 +124,28 @@ func pickItems():
 	sendItems.rpc(itemsForPlayers)
 
 @rpc("any_peer")
-func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pass
+func receiveLoadInfo():
+	print("ReceiveLoadInfo")
+	sendLoadInfo.rpc(roundIdx, loadIdx, currentPlayerTurn, healthPlayers, totalShells, liveCount)	
 
 @rpc("any_peer")
-func sendItems(itemsForPlayers): pass
+func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount):
+	print("SendLoadInfo: " + str(currentPlayerTurn) + ", " + str(healthPlayers) \
+		+ ", " + str(totalShells) + ", " + str(liveCount))
+
+@rpc("any_peer")
+func receiveItems():
+	print("ReceiveItems")
+	sendItems.rpc(itemsForPlayers)
+
+@rpc("any_peer")
+func sendItems(itemsForPlayers): print("SendItems: " + str(itemsForPlayers))
 
 @rpc("any_peer")
 func recieveActionValidation(action):
+	print("ReceiveActionValidation: " + action)
 	var result = null
-	var playerIdx = players.find(multiplayer.get_remote_sender_id())
+	var playerIdx = 0 if players[0][multiplayer.get_remote_sender_id()] != "" else 1
 	var opponentIdx = int(not playerIdx)
 	var validActions
 	if isStealing:
@@ -198,17 +231,21 @@ func recieveActionValidation(action):
 		else:
 			beginRound()
 	elif (shellArray.is_empty()):
+		loadIdx += 1
 		beginLoad()
 
 func doItem(action, playerIdx):
 	if isStealing:
 		playerIdx = int(not playerIdx)
 		isStealing = false
+		stealGrace = false
+		stealTimer = 0.0
 	itemsOnTable[playerIdx].erase(action)
 	itemAmounts_available[playerIdx][action][mode] += 1
 
 @rpc("any_peer")
-func sendActionValidation(action, result): pass
+func sendActionValidation(action, result):
+	print("SendActionValidation: " + action + ", " + str(result))
 
 @rpc("any_peer")
-func sendTimeoutAdrenaline(): pass
+func sendTimeoutAdrenaline(): print("SendTimeoutAdrenaline")
