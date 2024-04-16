@@ -72,6 +72,13 @@ func receiveJoinMatch(playerName):
 @rpc("any_peer")
 func sendJoinMatch(success): print("SendJoinMatch: " + str(success))
 
+@rpc("any_peer")
+func receivePlayerInfo():
+	sendPlayerInfo.rpc(players)
+
+@rpc("any_peer")
+func sendPlayerInfo(players): pass
+
 func beginMatch():
 	players.shuffle()
 	scores = []
