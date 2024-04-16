@@ -106,18 +106,20 @@ func closeLobby(id):
 
 @rpc("any_peer", "reliable")
 func createNewMultiplayerUser(username : String):
+	username = username.to_lower()
 	var signatureAndKey = AuthManager._generateUserCredentials()
 	var success = AuthManager._InsertNewUser(username, signatureAndKey[0])
 	if success:
-		recieveUserCreationStatus.rpc(true)
+		recieveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
+		recieveUserCreationStatus.rpc_id(multiplayer.get_remote_sender_id(), true, username)
 		AuthManager._loginToUserAccount(username)
 		notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
-		recieveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
 	else:
-		recieveUserCreationStatus.rpc(false)
+		recieveUserCreationStatus.rpc(false, "NA")
 
 @rpc("any_peer")
 func verifyUserCreds(username : String, key):
+	username = username.to_lower()
 	var signature = AuthManager._getUserSignature(username)
 	if !signature:
 		terminateSession(multiplayer.get_remote_sender_id(), "User does not exist")
@@ -141,13 +143,14 @@ func terminateSession(id, reason : String):
 	closeSession.rpc_id(id, reason)
 
 @rpc("any_peer") func recieveSenderUsername(username): 
+	username = username.to_lower()
 	providedUsername.emit(username)
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
 @rpc("any_peer") func recieveLobbyList(): pass
 @rpc("any_peer") func recieve_lobby_id(): pass
-@rpc("any_peer") func recieveUserCreationStatus(return_value: bool): pass
+@rpc("any_peer") func recieveUserCreationStatus(return_value: bool, username): pass
 @rpc("authority") func notifySuccessfulLogin(): pass
 @rpc("any_peer") func requestSenderUsername(): pass
 @rpc("authority") func recieveUserKey(keyString): pass 
