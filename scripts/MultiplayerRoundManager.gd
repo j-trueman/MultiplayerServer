@@ -21,7 +21,7 @@ const minItems = 2
 const maxItems = 5
 const adrenalineTimeout = 7.0
 
-var players
+var players = []
 var scores
 var currentPlayerTurn
 var matchStarter
@@ -114,9 +114,9 @@ func pickItems():
 		for item_onTable in itemsOnTable[i]:
 			itemAmounts_available[i][item_onTable][mode] -= 1
 		for j in range(0,min(numItems, 8-itemsOnTable[i].size())):
-			var availableItemArray
+			var availableItemArray = []
 			for item_available in itemAmounts_available[i]:
-				if itemAmounts_available[item_available][mode] > 0:
+				if itemAmounts_available[i][item_available][mode] > 0:
 					availableItemArray.append(item_available)
 			var item_forPlayer = availableItemArray.pick_random()
 			itemsForPlayers[i].append(item_forPlayer)
@@ -126,20 +126,21 @@ func pickItems():
 @rpc("any_peer")
 func receiveLoadInfo():
 	print("ReceiveLoadInfo")
+	print("SendLoadInfo: " + str(currentPlayerTurn) + ", " + str(healthPlayers) \
+		+ ", " + str(totalShells) + ", " + str(liveCount))
 	sendLoadInfo.rpc(roundIdx, loadIdx, currentPlayerTurn, healthPlayers, totalShells, liveCount)	
 
 @rpc("any_peer")
-func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount):
-	print("SendLoadInfo: " + str(currentPlayerTurn) + ", " + str(healthPlayers) \
-		+ ", " + str(totalShells) + ", " + str(liveCount))
+func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pass
 
 @rpc("any_peer")
 func receiveItems():
 	print("ReceiveItems")
+	print("SendItems: " + str(itemsForPlayers))
 	sendItems.rpc(itemsForPlayers)
 
 @rpc("any_peer")
-func sendItems(itemsForPlayers): print("SendItems: " + str(itemsForPlayers))
+func sendItems(itemsForPlayers): pass
 
 @rpc("any_peer")
 func recieveActionValidation(action):
@@ -215,6 +216,7 @@ func recieveActionValidation(action):
 		"inverter":
 			doItem(action, playerIdx)
 			shellArray[0] = int(not shellArray[0])
+	print("SendActionValidation: " + action + ", " + str(result))
 	sendActionValidation.rpc(action, result)
 	var roundOver = false
 	var winner
@@ -244,8 +246,7 @@ func doItem(action, playerIdx):
 	itemAmounts_available[playerIdx][action][mode] += 1
 
 @rpc("any_peer")
-func sendActionValidation(action, result):
-	print("SendActionValidation: " + action + ", " + str(result))
+func sendActionValidation(action, result): pass
 
 @rpc("any_peer")
-func sendTimeoutAdrenaline(): print("SendTimeoutAdrenaline")
+func sendTimeoutAdrenaline(): pass
