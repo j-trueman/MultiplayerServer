@@ -1,4 +1,4 @@
-extends Node
+class_name MRM extends Node
 
 const itemAmounts = {
 	"handsaw": [8, 3],
@@ -6,9 +6,9 @@ const itemAmounts = {
 	"beer": [8, 2],
 	"cigarettes": [2, 1],
 	"handcuffs": [8, 1],
-	"expired medicine": [0, 1],
+	"expired medicine": [0, 0],	#1 - DISABLED FOR NOW
 	"burner phone": [0, 1],
-	"adrenaline": [0, 2],
+	"adrenaline": [0, 0],	#2 - DISABLED FOR NOW
 	"inverter": [0, 2]
 }
 const minShells = 2
@@ -24,7 +24,6 @@ const adrenalineTimeout = 7.0
 var players = []
 var scores
 var currentPlayerTurn
-var matchStarter
 var roundIdx
 var loadIdx
 var shellArray
@@ -33,7 +32,10 @@ var liveCount
 var health
 var healthPlayers
 var numItems
+var actionReady
+var actionReady_first
 var itemsOnTable
+var itemsOnTable_ready
 var itemsForPlayers
 var itemAmounts_available
 var isSawed
@@ -44,28 +46,46 @@ var mode
 var mainTimer = 0.0
 var stealTimer = 0.0
 
-func _process(delta):
-	if (isStealing):
-		stealTimer += get_process_delta_time()
-		if stealTimer >= adrenalineTimeout + 5.0:
-			if not stealGrace: sendTimeoutAdrenaline.rpc()
-			stealGrace = true
-			if stealTimer >= adrenalineTimeout + 5.5:
-				isStealing = false
-				stealGrace = false
-				stealTimer = 0.0
+var matches_num = 1
+
+#func _process(delta):
+#	if (isStealing):
+#		stealTimer += get_process_delta_time()
+#		if stealTimer >= adrenalineTimeout + 5.0:
+#			if not stealGrace: sendTimeoutAdrenaline.rpc()
+#			stealGrace = true
+#			if stealTimer >= adrenalineTimeout + 5.5:
+#				isStealing = false
+#				stealGrace = false
+#				stealTimer = 0.0
+
+func getMatch(id, idx : Array):
+	var found = false
+	for child in get_children():
+		var i = 0
+		for player in child.players:
+			if player.keys()[0] == id:
+				idx[0] = i
+				return child
+			else:
+				i += 1
 
 @rpc("any_peer")
 func receiveJoinMatch(playerName):
 	print("ReceiveJoinMatch: " + playerName)
 	match players.size():
 		0: 
-			sendJoinMatch.rpc(true)
+			sendJoinMatch.rpc_id(multiplayer.get_remote_sender_id(), true)
 			players.append({multiplayer.get_remote_sender_id() : playerName})
 		1:
-			sendJoinMatch.rpc(true)
+			sendJoinMatch.rpc_id(multiplayer.get_remote_sender_id(), true)
 			players.append({multiplayer.get_remote_sender_id() : playerName})
-			beginMatch()
+			var mrm = MRM.new()
+			mrm.name = "Match " + str(matches_num)
+			mrm.players = players
+			add_child(mrm)
+			mrm.beginMatch()
+			matches_num += 1
 		2:
 			sendJoinMatch(false)
 	
@@ -74,26 +94,29 @@ func sendJoinMatch(success): print("SendJoinMatch: " + str(success))
 
 @rpc("any_peer")
 func receivePlayerInfo():
-	sendPlayerInfo.rpc(players)
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), [0])
+	sendPlayerInfo.rpc_id(multiplayer.get_remote_sender_id(), mrm.players)
 
 @rpc("any_peer")
 func sendPlayerInfo(players): pass
 
 func beginMatch():
 	players.shuffle()
-	scores = []
+	scores = [0,0]
 	roundIdx = 0
 	mode = 1
+	actionReady = 0
+	itemsOnTable_ready = 0
 	beginRound()
 
 func beginRound():
-	itemsOnTable = [[],[]]
-	itemAmounts_available = [itemAmounts, itemAmounts]
+	itemsOnTable = [["","","","","","","",""],
+					["","","","","","","",""]]
 	loadIdx = 0
 	
 	match roundIdx:
-		0: currentPlayerTurn = players.front()
-		1: currentPlayerTurn = int(not matchStarter)
+		0: currentPlayerTurn = 0
+		1: currentPlayerTurn = 1
 		2: currentPlayerTurn = randi_range(0,1)
 	
 	health = randi_range(minHealth, maxHealth)
@@ -116,26 +139,36 @@ func beginLoad():
 
 func pickItems():
 	itemsForPlayers = [[],[]]
+	itemAmounts_available = [itemAmounts.duplicate(), itemAmounts.duplicate()]
 	numItems = randi_range(minItems, maxItems)
-	for i in range(0,1):
+	for i in range(0,2):
+		var num_itemsOnTable = 0
 		for item_onTable in itemsOnTable[i]:
-			itemAmounts_available[i][item_onTable][mode] -= 1
-		for j in range(0,min(numItems, 8-itemsOnTable[i].size())):
+			if item_onTable != "":
+				num_itemsOnTable += 1
+				var newAmt = itemAmounts_available[i][item_onTable]
+				newAmt = [newAmt[0], newAmt[1] - 1] if bool(mode) else [newAmt[0] - 1, newAmt[1]]
+				itemAmounts_available[i][item_onTable] = newAmt
+		for j in range(0,min(numItems, 8-num_itemsOnTable)):
 			var availableItemArray = []
 			for item_available in itemAmounts_available[i]:
 				if itemAmounts_available[i][item_available][mode] > 0:
 					availableItemArray.append(item_available)
 			var item_forPlayer = availableItemArray.pick_random()
 			itemsForPlayers[i].append(item_forPlayer)
-			itemsOnTable[i].append(item_forPlayer)
-	sendItems.rpc(itemsForPlayers)
+			var newAmt = itemAmounts_available[i][item_forPlayer]
+			newAmt = [newAmt[0], newAmt[1] - 1] if bool(mode) else [newAmt[0] - 1, newAmt[1]]
+			itemAmounts_available[i][item_forPlayer] = newAmt
+	get_parent().sendItems.rpc(itemsForPlayers)
 
 @rpc("any_peer")
 func receiveLoadInfo():
 	print("ReceiveLoadInfo")
-	print("SendLoadInfo: " + str(currentPlayerTurn) + ", " + str(healthPlayers) \
-		+ ", " + str(totalShells) + ", " + str(liveCount))
-	sendLoadInfo.rpc(roundIdx, loadIdx, currentPlayerTurn, healthPlayers, totalShells, liveCount)	
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), [0])
+	print("SendLoadInfo: " + str(mrm.roundIdx) + ", " + str(mrm.loadIdx) + ", " + str(mrm.currentPlayerTurn) \
+		+ ", " + str(mrm.healthPlayers) + ", " + str(mrm.totalShells) + ", " + str(mrm.liveCount))
+	sendLoadInfo.rpc_id(multiplayer.get_remote_sender_id(), mrm.roundIdx, mrm.loadIdx, mrm.currentPlayerTurn, \
+		mrm.healthPlayers, mrm.totalShells, mrm.liveCount)
 
 @rpc("any_peer")
 func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pass
@@ -143,117 +176,171 @@ func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pas
 @rpc("any_peer")
 func receiveItems():
 	print("ReceiveItems")
-	print("SendItems: " + str(itemsForPlayers))
-	sendItems.rpc(itemsForPlayers)
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), [0])
+	print("SendItems: " + str(mrm.itemsForPlayers))
+	sendItems.rpc_id(multiplayer.get_remote_sender_id(), mrm.itemsForPlayers)
 
 @rpc("any_peer")
 func sendItems(itemsForPlayers): pass
 
 @rpc("any_peer")
-func recieveActionValidation(action):
+func receiveItemsOnTable(itemTableIdxArray):
+	print("ReceiveItemsOnTable: " + str(itemTableIdxArray))
+	var idxArray = [0]
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), idxArray)
+	var playerIdx = idxArray.pop_front()
+	if itemTableIdxArray.size() == mrm.itemsForPlayers[playerIdx].size():
+		for idx in itemTableIdxArray:
+			if mrm.itemsOnTable[playerIdx][idx].is_empty():
+				mrm.itemsOnTable[playerIdx][idx] = mrm.itemsForPlayers[playerIdx][0]
+				mrm.itemsForPlayers[playerIdx].remove_at(0)
+	mrm.itemsOnTable_ready += 1
+	if mrm.itemsOnTable_ready > 1:
+		for player in mrm.players:
+			print("SendItemsOnTable: " + str(mrm.itemsOnTable))
+			sendItemsOnTable.rpc_id(player.keys()[0], mrm.itemsOnTable)
+		mrm.itemsOnTable_ready = 0
+
+@rpc("any_peer")
+func sendItemsOnTable(itemsOnTable): pass
+
+@rpc("any_peer")
+func receiveActionValidation(action):
 	print("ReceiveActionValidation: " + action)
+	var action_temp = action
 	var result = null
-	var playerIdx = 0 if players[0][multiplayer.get_remote_sender_id()] != "" else 1
+	var idxArray = [0]
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), idxArray)
+	var playerIdx = idxArray.pop_front()
 	var opponentIdx = int(not playerIdx)
 	var validActions
-	if isStealing:
-		validActions = itemsOnTable[opponentIdx].duplicate()
+	if mrm.isStealing:
+		validActions = mrm.itemsOnTable[opponentIdx].duplicate()
 		validActions.erase("adrenaline")
 	else:
-		validActions = itemsOnTable[playerIdx].duplicate()
-		validActions.append_array(["shoot self", "shoot opponent"])
-	if isSawed: validActions.erase("handsaw")
-	if isHandcuffed[opponentIdx]: validActions.erase("handcuffs")
-	if playerIdx != currentPlayerTurn or validActions.find(action) < 0:
+		validActions = mrm.itemsOnTable[playerIdx].duplicate()
+		validActions.append_array(["pickup shotgun", "shoot self", "shoot opponent"])
+	while validActions.has(""):
+		validActions.erase("")
+	if mrm.isSawed: validActions.erase("handsaw")
+	if mrm.isHandcuffed[opponentIdx]: validActions.erase("handcuffs")
+	if action.length() == 1:
+		action = mrm.itemsOnTable[playerIdx][int(action)]
+	if playerIdx != mrm.currentPlayerTurn or validActions.find(action) < 0:
 		action = "invalid"
 	else: match action:
+		"pickup shotgun": pass
 		"shoot self":
-			var shell = shellArray.pop_front()
+			var shell = mrm.shellArray.pop_front()
 			result = shell
 			if shell == 1:
-				var damage = 2 if isSawed else 1
-				health[playerIdx] -= damage
-			if (shell == 1 and isHandcuffed[opponentIdx] != 2) \
-				or shellArray.is_empty():
-					currentPlayerTurn = int(not playerIdx)
-			if isHandcuffed[opponentIdx] > 0:
-				isHandcuffed[opponentIdx] -= 1
-			isSawed = false
+				var damage = 2 if mrm.isSawed else 1
+				mrm.healthPlayers[playerIdx] -= damage
+			if (shell == 1 and mrm.isHandcuffed[opponentIdx] != 2) \
+				or mrm.shellArray.is_empty():
+					mrm.currentPlayerTurn = int(not playerIdx)
+			if mrm.isHandcuffed[opponentIdx] > 0:
+				mrm.isHandcuffed[opponentIdx] -= 1
+			mrm.isSawed = false
 		"shoot opponent":
-			var shell = shellArray.pop_front()
+			var shell = mrm.shellArray.pop_front()
 			result = shell
 			if shell == 1:
-				var damage = 2 if isSawed else 1
-				health[opponentIdx] -= damage
-			if isHandcuffed[opponentIdx] != 2:
-				currentPlayerTurn = int(not playerIdx)
-			if isHandcuffed[opponentIdx] > 0:
-				isHandcuffed[opponentIdx] -= 1
-			isSawed = false
+				var damage = 2 if mrm.isSawed else 1
+				mrm.healthPlayers[opponentIdx] -= damage
+			if mrm.isHandcuffed[opponentIdx] != 2:
+				mrm.currentPlayerTurn = int(not playerIdx)
+			if mrm.isHandcuffed[opponentIdx] > 0:
+				mrm.isHandcuffed[opponentIdx] -= 1
+			mrm.isSawed = false
 		"handsaw":
-			doItem(action, playerIdx)
-			isSawed = true
+			mrm.doItem(action_temp, playerIdx)
+			mrm.isSawed = true
 		"magnifying glass":
-			doItem(action, playerIdx)
-			result = shellArray.front()
+			mrm.doItem(action_temp, playerIdx)
+			result = mrm.shellArray.front()
 		"beer":
-			doItem(action, playerIdx)
-			result = shellArray.pop_front()
-			if shellArray.is_empty():
-				currentPlayerTurn = int(not playerIdx)
+			mrm.doItem(action_temp, playerIdx)
+			result = mrm.shellArray.pop_front()
+			if mrm.shellArray.is_empty():
+				mrm.currentPlayerTurn = int(not playerIdx)
 		"cigarettes":
-			doItem(action, playerIdx)
-			healthPlayers[playerIdx] = min(health, healthPlayers[playerIdx] + 1)
-			result = healthPlayers[playerIdx]
+			mrm.doItem(action_temp, playerIdx)
+			mrm.healthPlayers[playerIdx] = min(mrm.health, mrm.healthPlayers[playerIdx] + 1)
+			result = mrm.healthPlayers[playerIdx]
 		"handcuffs":
-			doItem(action, playerIdx)
-			isHandcuffed[opponentIdx] = 2
+			mrm.doItem(action_temp, playerIdx)
+			mrm.isHandcuffed[opponentIdx] = 2
 		"expired medicine":
-			doItem(action, playerIdx)
-			result = randf_range(0.0, 1.0) < percentageMedicine
-			if result: health[playerIdx] -= 1
-			else: health[playerIdx] += 2
+			mrm.doItem(action_temp, playerIdx)
+			result = randf_range(0.0, 1.0) < mrm.percentageMedicine
+			if result: mrm.healthPlayers[playerIdx] -= 1
+			else: mrm.healthPlayers[playerIdx] += 2
 		"burner phone":
-			doItem(action, playerIdx)
-			var rand = randi_range(1,shellArray.size()-1)
-			result = rand if shellArray[rand] else -rand
+			mrm.doItem(action_temp, playerIdx)
+			var rand = randi_range(1,mrm.shellArray.size()-1)
+			if rand == 7: rand -= 1
+			result = rand if mrm.shellArray[rand] else -rand
 		"adrenaline":
-			doItem(action, playerIdx)
-			isStealing = true
+			mrm.doItem(action_temp, playerIdx)
+			mrm.isStealing = true
 		"inverter":
-			doItem(action, playerIdx)
-			shellArray[0] = int(not shellArray[0])
-	print("SendActionValidation: " + action + ", " + str(result))
-	sendActionValidation.rpc(action, result)
+			mrm.doItem(action_temp, playerIdx)
+			mrm.shellArray[0] = int(not mrm.shellArray[0])
+	print("SendActionValidation: " + action_temp + ", " + str(result))
+	for player in mrm.players:
+		sendActionValidation.rpc_id(player.keys()[0], action_temp, result)
 	var roundOver = false
 	var winner
-	for i in range(0,2):
-		if healthPlayers[i] < 1:
+	for i in range(2):
+		if mrm.healthPlayers[i] < 1:
 			winner = int(not i)
 			roundOver = true
 			break
 	if roundOver:
-		scores[winner] += 1
-		roundIdx += 1
-		if scores.max() > 1 or roundIdx > 2:
+		mrm.scores[winner] += 1
+		mrm.roundIdx += 1
+		if mrm.scores.max() > 1 or mrm.roundIdx > 2:
 			pass	# ending stuff
 		else:
-			beginRound()
-	elif (shellArray.is_empty()):
-		loadIdx += 1
-		beginLoad()
+			mrm.beginRound()
+	elif (mrm.shellArray.is_empty()):
+		mrm.loadIdx += 1
+		mrm.beginLoad()
 
-func doItem(action, playerIdx):
+func doItem(action_temp, playerIdx):
 	if isStealing:
 		playerIdx = int(not playerIdx)
 		isStealing = false
 		stealGrace = false
 		stealTimer = 0.0
-	itemsOnTable[playerIdx].erase(action)
-	itemAmounts_available[playerIdx][action][mode] += 1
+	var action = itemsOnTable[playerIdx][int(action_temp)]
+	itemsOnTable[playerIdx][int(action_temp)] = ""
+	var newAmt = itemAmounts_available[playerIdx][action]
+	newAmt = [newAmt[0], newAmt[1] + 1] if bool(mode) else [newAmt[0] + 1, newAmt[1]]
+	itemAmounts_available[playerIdx][action] = newAmt
 
 @rpc("any_peer")
 func sendActionValidation(action, result): pass
 
 @rpc("any_peer")
 func sendTimeoutAdrenaline(): pass
+
+@rpc("any_peer")
+func receiveActionReady():
+	var idxArray = [0]
+	var mrm = getMatch(multiplayer.get_remote_sender_id(), idxArray)
+	var playerIdx = idxArray.pop_front()
+	print("ReceiveActionReady from " + mrm.players[playerIdx].values()[0])
+	if mrm.actionReady_first != multiplayer.get_remote_sender_id():
+		mrm.actionReady += 1
+		mrm.actionReady_first = multiplayer.get_remote_sender_id()
+	if mrm.actionReady > 1:
+		for player in mrm.players:
+			sendActionReady.rpc_id(player.keys()[0])
+		print("SendActionReady")
+		mrm.actionReady = 0
+		mrm.actionReady_first = 0
+
+@rpc("any_peer")
+func sendActionReady(): pass
