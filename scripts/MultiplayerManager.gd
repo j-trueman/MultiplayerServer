@@ -16,6 +16,7 @@ var playerInfo = {"name": "Name"}
 var lobbyIdChars = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
 var joinCodeChars = 'qwertyuiopasdfghjklzxcvbnm'
 var multiplayerRoundManager
+var roundmanagerstore = []
 
 func _ready():
 	multiplayer.peer_connected.connect(_onPlayerConnected)
@@ -24,6 +25,13 @@ func _ready():
 	multiplayer.connection_failed.connect(_onConnectionFail)
 	multiplayer.server_disconnected.connect(_onServerDisconnected)
 	_createServer()
+	RoundManagerStoreTest()
+
+
+func RoundManagerStoreTest():
+	var roundmanagerinstance = MultiplayerRoundManager.new()
+	roundmanagerstore.append(roundmanagerinstance)
+	print(roundmanagerstore)
 
 func _createServer():
 	var multiplayerPeer = ENetMultiplayerPeer.new()
@@ -62,6 +70,7 @@ func registerPlayer(newPlayerInfo):
 func _onPlayerDisconnected(id):
 	players.erase(id)
 	playerDisconnected.emit(id)
+	print("someone disconnected")
 
 func _onPlayerConnectedOk():
 	var peerId = multiplayer.get_unique_id()
@@ -115,18 +124,18 @@ func createNewMultiplayerUser(username : String):
 		AuthManager._loginToUserAccount(username)
 		notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
 	else:
-		recieveUserCreationStatus.rpc(false, "NA")
+		recieveUserCreationStatus.rpc(false)
 
 @rpc("any_peer")
 func verifyUserCreds(username : String, key):
 	username = username.to_lower()
 	var signature = AuthManager._getUserSignature(username)
 	if !signature:
-		terminateSession(multiplayer.get_remote_sender_id(), "User does not exist")
+		terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
 		return false
 	var credsAreCorrect = AuthManager._verifyUserSignature(signature, key)
 	if !credsAreCorrect:
-		terminateSession(multiplayer.get_remote_sender_id(), "Incorrect Credentials")
+		terminateSession(multiplayer.get_remote_sender_id(), "incorrectCreds")
 		return false
 	AuthManager._loginToUserAccount(username)
 	notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
@@ -146,6 +155,16 @@ func terminateSession(id, reason : String):
 	username = username.to_lower()
 	providedUsername.emit(username)
 
+@rpc("any_peer")
+func requestPlayerList():
+	recievePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
+	
+@rpc("any_peer")
+func inviteUser(id, username):
+	var inviteeUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(id)]
+	print("%s sent an invite to %s with id %s" % [username, inviteeUsername, id])
+	recieveInvite.rpc_id(id, username, multiplayer.get_remote_sender_id())
+
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
 @rpc("any_peer") func recieveLobbyList(): pass
@@ -154,6 +173,8 @@ func terminateSession(id, reason : String):
 @rpc("authority") func notifySuccessfulLogin(): pass
 @rpc("any_peer") func requestSenderUsername(): pass
 @rpc("authority") func recieveUserKey(keyString): pass 
+@rpc("authority") func recievePlayerList(dict): pass
+@rpc("authority") func recieveInvite(from, id): pass
 
 # DEBUG INPUTS
 func _input(ev):
