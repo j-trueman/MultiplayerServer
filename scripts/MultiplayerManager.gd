@@ -8,8 +8,6 @@ signal providedUsername(username)
 const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
 
 var players = {}
-var publicLobbies = {}
-var privateLobbies = {}
 var playersLoaded = 0
 
 var playerInfo = {"name": "Name"}
@@ -44,10 +42,6 @@ func _createServer():
 		return error
 	multiplayer.multiplayer_peer = multiplayerPeer
 	print("CREATED SERVER")
-
-@rpc("any_peer")
-func requestLobbyList():
-	recieveLobbyList.rpc(publicLobbies)
 
 func _removeMultiplayerPeer():
 	multiplayer.multiplayer_peer = null
@@ -85,17 +79,17 @@ func _onServerDisconnected():
 	players.clear()
 	serverDisconnected.emit()
 	
-@rpc("any_peer", "reliable")
-func create_lobby(max_players, turn_type, lobby_type):
-	var lobby_id = generate_ID(lobbyIdChars, 20)
-	var lobby_join_code = generate_ID(joinCodeChars, 5)
-	var lobby_info = {"host" : multiplayer.get_remote_sender_id(), "players" : [multiplayer.get_remote_sender_id()], "max players" : max_players, "turn type": turn_type, "lobby_type" : lobby_type, "join_code" : lobby_join_code}
-	if lobby_type == "public":
-		publicLobbies[lobby_id] = lobby_info
-	else:
-		privateLobbies[lobby_id] = lobby_info
-	print("CREATED NEW %s LOBBY %s:\n\t%s" % [lobby_info["lobby_type"],lobby_id, lobby_info])
-	recieve_lobby_id.rpc(lobby_id)
+#@rpc("any_peer", "reliable")
+#func create_lobby(max_players, turn_type, lobby_type):
+	#var lobby_id = generate_ID(lobbyIdChars, 20)
+	#var lobby_join_code = generate_ID(joinCodeChars, 5)
+	#var lobby_info = {"host" : multiplayer.get_remote_sender_id(), "players" : [multiplayer.get_remote_sender_id()], "max players" : max_players, "turn type": turn_type, "lobby_type" : lobby_type, "join_code" : lobby_join_code}
+	#if lobby_type == "public":
+		#publicLobbies[lobby_id] = lobby_info
+	#else:
+		#privateLobbies[lobby_id] = lobby_info
+	#print("CREATED NEW %s LOBBY %s:\n\t%s" % [lobby_info["lobby_type"],lobby_id, lobby_info])
+	#recieve_lobby_id.rpc(lobby_id)
 	
 func generate_ID(chars, length):
 	var word: String
@@ -104,14 +98,14 @@ func generate_ID(chars, length):
 		word += chars[randi()% n_char]
 	return word
 	
-@rpc("any_peer")
-func closeLobby(id):
-	var authenticatedUsername = await verifyUserId(multiplayer.get_remote_sender_id())
-	if !authenticatedUsername:
-		return false
-	publicLobbies.erase(id)
-	privateLobbies.erase(id)
-	print("%s CLOSED LOBBY %s" % [authenticatedUsername,id])
+#@rpc("any_peer")
+#func closeLobby(id):
+	#var authenticatedUsername = await verifyUserId(multiplayer.get_remote_sender_id())
+	#if !authenticatedUsername:
+		#return false
+	#publicLobbies.erase(id)
+	#privateLobbies.erase(id)
+	#print("%s CLOSED LOBBY %s" % [authenticatedUsername,id])
 
 @rpc("any_peer", "reliable")
 func createNewMultiplayerUser(username : String):
@@ -167,8 +161,8 @@ func inviteUser(id, username):
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
-@rpc("any_peer") func recieveLobbyList(): pass
-@rpc("any_peer") func recieve_lobby_id(): pass
+#@rpc("any_peer") func recieveLobbyList(): pass
+#@rpc("any_peer") func recieve_lobby_id(): pass
 @rpc("any_peer") func recieveUserCreationStatus(return_value: bool, username): pass
 @rpc("authority") func notifySuccessfulLogin(): pass
 @rpc("any_peer") func requestSenderUsername(): pass
