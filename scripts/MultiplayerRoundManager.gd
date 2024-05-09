@@ -71,7 +71,8 @@ func getMatch(id, idx : Array):
 				i += 1
 
 @rpc("any_peer")
-func receiveJoinMatch(playerName):
+func receiveJoinMatch():
+	var playerName = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(multiplayer.get_remote_sender_id())]
 	print("ReceiveJoinMatch: " + playerName)
 	match players.size():
 		0: 

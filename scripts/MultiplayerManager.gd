@@ -115,8 +115,8 @@ func createNewMultiplayerUser(username : String):
 	if success:
 		receiveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
 		receiveUserCreationStatus.rpc_id(multiplayer.get_remote_sender_id(), true, username)
-		AuthManager._loginToUserAccount(username)
-		notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
+		#AuthManager._loginToUserAccount(username)
+		#notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
 	else:
 		receiveUserCreationStatus.rpc(false)
 
@@ -154,10 +154,10 @@ func requestPlayerList():
 	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
 @rpc("any_peer")
-func inviteUser(id, username):
-	var inviteeUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(id)]
-	print("%s sent an invite to %s with id %s" % [username, inviteeUsername, id])
-	receiveInvite.rpc_id(id, username, multiplayer.get_remote_sender_id())
+func inviteUser(receiverID, senderUsername):
+	var receiverUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(receiverID)]
+	print("%s sent an invite to %s with id %s" % [senderUsername, receiverUsername, receiverID])
+	recieveInvite.rpc_id(receiverID, senderUsername, multiplayer.get_remote_sender_id())
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
