@@ -89,7 +89,7 @@ func _onServerDisconnected():
 	#else:
 		#privateLobbies[lobby_id] = lobby_info
 	#print("CREATED NEW %s LOBBY %s:\n\t%s" % [lobby_info["lobby_type"],lobby_id, lobby_info])
-	#recieve_lobby_id.rpc(lobby_id)
+	#receive_lobby_id.rpc(lobby_id)
 	
 func generate_ID(chars, length):
 	var word: String
@@ -113,12 +113,12 @@ func createNewMultiplayerUser(username : String):
 	var signatureAndKey = AuthManager._generateUserCredentials()
 	var success = AuthManager._InsertNewUser(username, signatureAndKey[0])
 	if success:
-		recieveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
-		recieveUserCreationStatus.rpc_id(multiplayer.get_remote_sender_id(), true, username)
+		receiveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
+		receiveUserCreationStatus.rpc_id(multiplayer.get_remote_sender_id(), true, username)
 		AuthManager._loginToUserAccount(username)
 		notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
 	else:
-		recieveUserCreationStatus.rpc(false)
+		receiveUserCreationStatus.rpc(false)
 
 @rpc("any_peer")
 func verifyUserCreds(username : String, key):
@@ -145,30 +145,30 @@ func verifyUserId(id : int):
 func terminateSession(id, reason : String):
 	closeSession.rpc_id(id, reason)
 
-@rpc("any_peer") func recieveSenderUsername(username): 
+@rpc("any_peer") func receiveSenderUsername(username): 
 	username = username.to_lower()
 	providedUsername.emit(username)
 
 @rpc("any_peer")
 func requestPlayerList():
-	recievePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
+	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
 @rpc("any_peer")
 func inviteUser(id, username):
 	var inviteeUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(id)]
 	print("%s sent an invite to %s with id %s" % [username, inviteeUsername, id])
-	recieveInvite.rpc_id(id, username, multiplayer.get_remote_sender_id())
+	receiveInvite.rpc_id(id, username, multiplayer.get_remote_sender_id())
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
-#@rpc("any_peer") func recieveLobbyList(): pass
-#@rpc("any_peer") func recieve_lobby_id(): pass
-@rpc("any_peer") func recieveUserCreationStatus(return_value: bool, username): pass
+#@rpc("any_peer") func receiveLobbyList(): pass
+#@rpc("any_peer") func receive_lobby_id(): pass
+@rpc("any_peer") func receiveUserCreationStatus(return_value: bool, username): pass
 @rpc("authority") func notifySuccessfulLogin(): pass
 @rpc("any_peer") func requestSenderUsername(): pass
-@rpc("authority") func recieveUserKey(keyString): pass 
-@rpc("authority") func recievePlayerList(dict): pass
-@rpc("authority") func recieveInvite(from, id): pass
+@rpc("authority") func receiveUserKey(keyString): pass 
+@rpc("authority") func receivePlayerList(dict): pass
+@rpc("authority") func receiveInvite(from, id): pass
 
 # DEBUG INPUTS
 func _input(ev):
