@@ -63,4 +63,6 @@ func _loginToUserAccount(accountName : String):
 	print("USER %s LOGGED IN WITH ID %s" % [accountName, multiplayer.get_remote_sender_id()])
 
 func _logoutOfUserAccount(accountID):
-	loggedInPlayerIds.erase(loggedInPlayerIds.keys()[loggedInPlayerIds.values().find(accountID)])
+	var found = loggedInPlayerIds.values().find(accountID)
+	if found > 0:
+		loggedInPlayerIds.erase(loggedInPlayerIds.keys()[found ])
