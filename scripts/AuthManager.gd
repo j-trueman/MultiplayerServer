@@ -7,6 +7,7 @@ var data = "multiplayersignature"
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	MultiplayerManager.playerDisconnected.connect(_logoutOfUserAccount)
 	database = SQLite.new()
 	database.path = "res://authsignatures.db"
 	database.open_db()
@@ -60,3 +61,6 @@ func _verifyUserSignature(signature : PackedByteArray, key):
 func _loginToUserAccount(accountName : String):
 	loggedInPlayerIds[accountName] = multiplayer.get_remote_sender_id()
 	print("USER %s LOGGED IN WITH ID %s" % [accountName, multiplayer.get_remote_sender_id()])
+
+func _logoutOfUserAccount(accountID):
+	loggedInPlayerIds.erase(loggedInPlayerIds.keys()[loggedInPlayerIds.values().find(accountID)])

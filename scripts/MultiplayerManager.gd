@@ -157,7 +157,7 @@ func requestPlayerList():
 func inviteUser(receiverID, senderUsername):
 	var receiverUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(receiverID)]
 	print("%s sent an invite to %s with id %s" % [senderUsername, receiverUsername, receiverID])
-	recieveInvite.rpc_id(receiverID, senderUsername, multiplayer.get_remote_sender_id())
+	receiveInvite.rpc_id(receiverID, senderUsername, multiplayer.get_remote_sender_id())
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
