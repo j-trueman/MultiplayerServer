@@ -22,6 +22,7 @@ func _ready():
 	multiplayer.connected_to_server.connect(_onPlayerConnectedOk)
 	multiplayer.connection_failed.connect(_onConnectionFail)
 	multiplayer.server_disconnected.connect(_onServerDisconnected)
+	multiplayer.server_relay = false
 	_createServer()
 	RoundManagerStoreTest()
 
@@ -159,6 +160,10 @@ func inviteUser(receiverID, senderUsername):
 	print("%s sent an invite to %s with id %s" % [senderUsername, receiverUsername, receiverID])
 	receiveInvite.rpc_id(receiverID, senderUsername, multiplayer.get_remote_sender_id())
 
+@rpc("any_peer")
+func sendInviteStatus(id, status):
+	receiveInviteStatus.rpc_id(id, status)
+
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
 #@rpc("any_peer") func receiveLobbyList(): pass
@@ -169,6 +174,7 @@ func inviteUser(receiverID, senderUsername):
 @rpc("authority") func receiveUserKey(keyString): pass 
 @rpc("authority") func receivePlayerList(dict): pass
 @rpc("authority") func receiveInvite(from, id): pass
+@rpc("authority") func receiveInviteStatus(status): pass
 
 # DEBUG INPUTS
 func _input(ev):
