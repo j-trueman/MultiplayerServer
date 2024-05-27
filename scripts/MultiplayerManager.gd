@@ -1,200 +1,93 @@
 extends Node
 
-signal playerConnected(peer_id, player_info)
-signal playerDisconnected(peer_id)
-signal serverDisconnected
-signal providedUsername(username)
-
 const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
-
-var players = {}
-var playersLoaded = 0
-var invites = {}
-
-var playerInfo = {"name": "Name"}
-var lobbyIdChars = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
-var joinCodeChars = 'qwertyuiopasdfghjklzxcvbnm'
+const InviteManager = preload("res://scripts/InviteManager.gd")
 var multiplayerRoundManager
-var roundmanagerstore = []
+var inviteManager
 
 func _ready():
 	multiplayer.server_relay = false
-	multiplayer.peer_connected.connect(_onPlayerConnected)
-	multiplayer.peer_disconnected.connect(_onPlayerDisconnected)
-	multiplayer.connected_to_server.connect(_onPlayerConnectedOk)
-	multiplayer.connection_failed.connect(_onConnectionFail)
-	multiplayer.server_disconnected.connect(_onServerDisconnected)
-	multiplayer.server_relay = false
+	
+	multiplayerRoundManager = MultiplayerRoundManager.new()
+	multiplayerRoundManager.name = "MultiplayerRoundManager"
+	add_child(multiplayerRoundManager)
+	
+	inviteManager = InviteManager.new()
+	inviteManager.name = "InviteManager"
+	add_child(inviteManager)
+	
 	_createServer()
-	RoundManagerStoreTest()
-
-func RoundManagerStoreTest():
-	var roundmanagerinstance = MultiplayerRoundManager.new()
-	roundmanagerstore.append(roundmanagerinstance)
-	print(roundmanagerstore)
 
 func _createServer():
 	var multiplayerPeer = ENetMultiplayerPeer.new()
 	var error = multiplayerPeer.create_server(2244, 1000)
-	multiplayerRoundManager = MultiplayerRoundManager.new()
-	multiplayerRoundManager.name = "multiplayer round manager"
-	add_child(multiplayerRoundManager)
-	
 	if error:
 		return error
 	multiplayer.multiplayer_peer = multiplayerPeer
 	print("CREATED SERVER")
 
-func _removeMultiplayerPeer():
-	multiplayer.multiplayer_peer = null
-
-func _playerLoaded():
-	if multiplayer.is_server():
-		playersLoaded += 1
-
-func _onPlayerConnected(id):
-	registerPlayer.rpc_id(id, playerInfo)
-
-@rpc("any_peer", "reliable")
-func registerPlayer(newPlayerInfo):
-	var newPlayerId = multiplayer.get_remote_sender_id()
-	players[newPlayerId] = newPlayerInfo
-	playerConnected.emit(newPlayerId, newPlayerInfo)
-	print("Player %s connected" % newPlayerId)
-	_playerLoaded()
-
-func _onPlayerDisconnected(id):
-	var match_forId = multiplayerRoundManager.getMatch(id, [])
-	if match_forId != null:
-		multiplayerRoundManager.queue_free(match_forId)
-	players.erase(id)
-	playerDisconnected.emit(id)
-	print("someone disconnected")
-
-func _onPlayerConnectedOk():
-	var peerId = multiplayer.get_unique_id()
-	players[peerId] = playerInfo
-	playerConnected.emit(peerId, playerInfo)
-
-func _onConnectionFail():
-	multiplayer.multiplayer_peer = null
-
-func _onServerDisconnected():
-	multiplayer.multiplayer_peer = null
-	players.clear()
-	serverDisconnected.emit()
-	
-#@rpc("any_peer", "reliable")
-#func create_lobby(max_players, turn_type, lobby_type):
-	#var lobby_id = generate_ID(lobbyIdChars, 20)
-	#var lobby_join_code = generate_ID(joinCodeChars, 5)
-	#var lobby_info = {"host" : multiplayer.get_remote_sender_id(), "players" : [multiplayer.get_remote_sender_id()], "max players" : max_players, "turn type": turn_type, "lobby_type" : lobby_type, "join_code" : lobby_join_code}
-	#if lobby_type == "public":
-		#publicLobbies[lobby_id] = lobby_info
-	#else:
-		#privateLobbies[lobby_id] = lobby_info
-	#print("CREATED NEW %s LOBBY %s:\n\t%s" % [lobby_info["lobby_type"],lobby_id, lobby_info])
-	#receive_lobby_id.rpc(lobby_id)
-	
-func generate_ID(chars, length):
-	var word: String
-	var n_char = len(chars)
-	for i in range(length):
-		word += chars[randi()% n_char]
-	return word
-	
-#@rpc("any_peer")
-#func closeLobby(id):
-	#var authenticatedUsername = await verifyUserId(multiplayer.get_remote_sender_id())
-	#if !authenticatedUsername:
-		#return false
-	#publicLobbies.erase(id)
-	#privateLobbies.erase(id)
-	#print("%s CLOSED LOBBY %s" % [authenticatedUsername,id])
-
-@rpc("any_peer", "reliable")
-func createNewMultiplayerUser(username : String):
-	username = username.to_lower()
-	var signatureAndKey = AuthManager._generateUserCredentials()
-	var success = AuthManager._InsertNewUser(username, signatureAndKey[0])
-	if success:
-		receiveUserKey.rpc_id(multiplayer.get_remote_sender_id(), signatureAndKey[1])
-		receiveUserCreationStatus.rpc_id(multiplayer.get_remote_sender_id(), true, username)
-		#AuthManager._loginToUserAccount(username)
-		#notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
-	else:
-		receiveUserCreationStatus.rpc(false)
-
-@rpc("any_peer")
-func verifyUserCreds(username : String, key):
-	username = username.to_lower()
-	var signature = AuthManager._getUserSignature(username)
-	if !signature:
-		terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
-		return false
-	var credsAreCorrect = AuthManager._verifyUserSignature(signature, key)
-	if !credsAreCorrect:
-		terminateSession(multiplayer.get_remote_sender_id(), "incorrectCreds")
-		return false
-	AuthManager._loginToUserAccount(username)
-	notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id())
-
-func verifyUserId(id : int):
-	requestSenderUsername.rpc_id(id)
-	var username = await providedUsername
-	var usernameInDatabase = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(id)]
-	if usernameInDatabase == username:
-		return username
-	return false
-
 func terminateSession(id, reason : String):
 	closeSession.rpc_id(id, reason)
 
+@rpc("any_peer", "reliable")
+func requestNewUser(username : String):
+	var key = AuthManager._CreateNewUser(username)
+	if !key:
+		terminateSession(multiplayer.get_remote_sender_id(), "userExists")
+	receivePrivateKey.rpc_id(multiplayer.get_remote_sender_id(), key)
+
 @rpc("any_peer")
-func receiveSenderUsername(username): 
-	username = username.to_lower()
-	providedUsername.emit(username)
+func verifyUserCreds(keyFileData : PackedByteArray):
+	var keyFileDataString = keyFileData.get_string_from_utf8().split(":")
+	var keyData = keyFileDataString[0]
+	var username = keyFileDataString[1]
+	var verified = AuthManager._verifyKeyFile(username, keyData)
+	if !verified:
+		return false
+	AuthManager._loginToUserAccount(username)
 
 @rpc("any_peer")
 func requestPlayerList():
-	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
+	var list = AuthManager.loggedInPlayerIds.duplicate()
+	list.erase(list.find_key(multiplayer.get_remote_sender_id()))
+	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), list)
 	
 @rpc("any_peer")
-func inviteUser(receiverUsername):
-	var id = multiplayer.get_remote_sender_id()
-	if not invites.keys().has(receiverUsername):
-		var senderUsername = AuthManager.getUsername(id)
-		invites[receiverUsername] = senderUsername
-		receiveInvite.rpc_id(AuthManager.loggedInPlayerIds[receiverUsername], senderUsername)
-	else:
-		sendInviteStatus.rpc_id(id,"busy")
+func requestUserExistsStatus(username : String):
+	print("requesting status of " + username)
+	if len(AuthManager._checkUserExists(username.to_lower())) > 0:
+		terminateSession(multiplayer.get_remote_sender_id(), "userExists")
+		return false
+	terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
 
 @rpc("any_peer")
-func receiveInviteStatus(status):
-	var id = multiplayer.get_remote_sender_id()
-	var receiverUsername = AuthManager.getUsername(id)
-	var senderUsername = invites[receiverUsername]
-	var senderId = AuthManager.loggedInPlayerIds[senderUsername]
-	invites.erase(receiverUsername)
-	if status == "accept" or status == "deny":
-		sendInviteStatus.rpc_id(senderId, receiverUsername, status)
-	if status == "accept":
-		var players_forMatch = [{senderId: senderUsername}, {id: receiverUsername}]
-		multiplayerRoundManager.createMatch(players_forMatch)
+func createInvite(to):
+	var invite = inviteManager.Invite.new(multiplayer.get_remote_sender_id(), to)
+	inviteManager.activeInvites.append(invite)
+	
+@rpc("any_peer")
+func acceptInvite(from):
+	if !inviteManager.acceptInvite(from, multiplayer.get_remote_sender_id()):
+		print("This user does not have an invite from %s" % from)
 
+@rpc("any_peer")
+func denyInvite(from):
+	if !inviteManager.denyInvite(from, multiplayer.get_remote_sender_id()):
+		print("This user does not have an invite from %s" % from)
+		
+@rpc("any_peer") 
+func retractInvite(to): 
+	inviteManager.retractInvite(multiplayer.get_remote_sender_id(), to)
+	
+@rpc("any_peer") 
+func rectractAllInvites(): 
+	inviteManager.retractAllInvites(multiplayer.get_remote_sender_id())
+	
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
-#@rpc("any_peer") func receiveLobbyList(): pass
-#@rpc("any_peer") func receive_lobby_id(): pass
 @rpc("any_peer") func receiveUserCreationStatus(return_value: bool, username): pass
-@rpc("any_peer") func notifySuccessfulLogin(): pass
-@rpc("any_peer") func requestSenderUsername(): pass
-@rpc("any_peer") func receiveUserKey(keyString): pass 
+@rpc("any_peer") func notifySuccessfulLogin(username : String): pass
+@rpc("any_peer") func receivePrivateKey(keyString): pass 
 @rpc("any_peer") func receivePlayerList(dict): pass
-@rpc("any_peer") func receiveInvite(senderUsername): pass
-@rpc("any_peer") func sendInviteStatus(receiverUsername, status): pass
-
-# DEBUG INPUTS
-func _input(ev):
-	if Input.is_key_pressed(KEY_L):
-		print(str(AuthManager.loggedInPlayerIds))
+@rpc("any_peer") func receiveInvite(from, id): pass
+@rpc("any_peer") func receiveInviteStatus(status): pass
