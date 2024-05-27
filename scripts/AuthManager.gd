@@ -3,13 +3,11 @@ extends Node
 var database : SQLite
 var loggedInPlayerIds = {}
 var crypto = Crypto.new()
-var data = "multiplayersignature"
 
-# Called when the node enters the scene tree for the first time.
 func _ready():
-	MultiplayerManager.playerDisconnected.connect(_logoutOfUserAccount)
+	multiplayer.peer_disconnected.connect(_logoutOfUserAccount)
 	database = SQLite.new()
-	database.path = "res://authsignatures.db"
+	database.path = "res://authkeys.db"
 	database.open_db()
 	var result = database.query("SELECT * FROM users WHERE 0")
 	if result:
@@ -18,51 +16,74 @@ func _ready():
 		print("TABLE DOES NOT EXIST. CREATING...")
 		var table = {
 			"username" : {"data_type" : "text", "primary_key":true, "not_null": true},
-			"signature" : {"data_type": "blob", "not_null":true}
+			"key" : {"data_type": "blob", "not_null":true}
 		}
 		database.create_table("users", table)
 
-func _generateUserCredentials():
+func _CreateNewUser(username : String):
+	# Make sure username is all lowercase and less than 11 characters
+	username = username.to_lower()
+	if len(username) > 10: 
+		return null
+	
+	# Return false if user already exists
+	if len(_checkUserExists(username)) > 0: 
+		return null
+	
+	# Generate private key
 	var privateKey = CryptoKey.new()
 	privateKey = crypto.generate_rsa(4096)
-	var signature = crypto.sign(HashingContext.HASH_SHA256, data.sha256_buffer(), privateKey)
-	var keyAsString = privateKey.save_to_string()
-	return [signature,keyAsString]
+	
+	# Insert user into database
+	if !_InsertToDatabase(username, privateKey.save_to_string().to_utf8_buffer()): 
+		return null
+	
+	# Append username to private key and return this to user for storage
+	var keyString = privateKey.save_to_string() + ":%s" % username
+	return keyString
 
-func _InsertNewUser(username : String, signature : PackedByteArray) -> bool:
+func _checkUserExists(usernameToCheck : String):
+	# Check database for requested user
+	var userExists = database.select_rows("users", "username = '%s'" % usernameToCheck, ["*"])
+	return userExists
+
+func _InsertToDatabase(username : String, privateKey : PackedByteArray) -> bool:
 	username = username.to_lower()
 	var data = {
 		"username" : username,
-		"signature" : signature,
+		"key" : privateKey,
 	}
+	# Attempt to insert new user data into database
 	var success = database.insert_row("users", data)
-	if success:
-		print("CREATED NEW USER %s" % username)
-		return true
-	else:
-		print("FAILED TO CREATE, USER %s ALREADY EXISTS" % username)
+	if !success:
 		return false
-		
-func _getUserSignature(username : String):
-	var signature = database.select_rows("users", "username = '%s'" % username,["signature"])
-	if len(signature) == 0:
-		print("USER DOES NOT EXIST")
-		return false
-	return signature[0].get("signature", PackedByteArray())
-	
-func _verifyUserSignature(signature : PackedByteArray, key):
-	var keyToUse = CryptoKey.new()
-	keyToUse.load_from_string(key)
-	var verified = crypto.verify(HashingContext.HASH_SHA256, data.sha256_buffer(), signature, keyToUse)
-	if !verified:
-		return false
+	print("CREATED NEW USER %s" % username)
 	return true
 	
-func _loginToUserAccount(accountName : String):
-	loggedInPlayerIds[accountName] = multiplayer.get_remote_sender_id()
-	print("USER %s LOGGED IN WITH ID %s" % [accountName, multiplayer.get_remote_sender_id()])
+func _verifyKeyFile(username : String, keyData : String):
+	# Get the key in the database for the requested user
+	var keyInDatabase = database.select_rows("users", "username = '%s'" % username, ["key"])
+	# If a key is not returned, the user does not exist
+	if len(keyInDatabase) == 0:
+		print("User does not exist")
+		return false
+	# If the key in the database matches the provided key then the user can be authenticated
+	if keyInDatabase[0].values()[0].get_string_from_utf8() != keyData:
+		return false
+	return true
 
-func _logoutOfUserAccount(accountID):
-	var found = loggedInPlayerIds.values().find(accountID)
-	if found > 0:
-		loggedInPlayerIds.erase(loggedInPlayerIds.keys()[found ])
+# Only called if _verifyKeyFile returns true
+func _loginToUserAccount(username : String):
+	loggedInPlayerIds[username] = multiplayer.get_remote_sender_id()
+	MultiplayerManager.notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id(), username)
+	print("USER %s LOGGED IN WITH ID %s" % [username, multiplayer.get_remote_sender_id()])
+
+# Called whenever a session disconnects
+func _logoutOfUserAccount(sessionID):
+	# Make sure the user is logged in before trying to log them out
+	# (This avoids a weird bug where the server still tries to log a user out even if their initial connection fails)
+	var found = loggedInPlayerIds.find_key(sessionID)
+	if found != null:
+		# Remove the player from the list of logged in players
+		loggedInPlayerIds.erase(found)
+		print("SESSIONID %s LOGGED OUT" % sessionID)
