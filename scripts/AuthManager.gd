@@ -65,4 +65,7 @@ func _loginToUserAccount(accountName : String):
 func _logoutOfUserAccount(accountID):
 	var found = loggedInPlayerIds.values().find(accountID)
 	if found > 0:
-		loggedInPlayerIds.erase(loggedInPlayerIds.keys()[found ])
+		loggedInPlayerIds.erase(loggedInPlayerIds.keys()[found])
+		
+func getUsername(id):
+	return loggedInPlayerIds.keys()[loggedInPlayerIds.values().find(id)]

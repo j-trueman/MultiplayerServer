@@ -9,6 +9,7 @@ const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.g
 
 var players = {}
 var playersLoaded = 0
+var invites = {}
 
 var playerInfo = {"name": "Name"}
 var lobbyIdChars = 'qwertyuiopasdfgjklzxcvbnm123456789QWERTYUIOPASDFGJKLZXCVBNMM'
@@ -17,6 +18,7 @@ var multiplayerRoundManager
 var roundmanagerstore = []
 
 func _ready():
+	multiplayer.server_relay = false
 	multiplayer.peer_connected.connect(_onPlayerConnected)
 	multiplayer.peer_disconnected.connect(_onPlayerDisconnected)
 	multiplayer.connected_to_server.connect(_onPlayerConnectedOk)
@@ -25,7 +27,6 @@ func _ready():
 	multiplayer.server_relay = false
 	_createServer()
 	RoundManagerStoreTest()
-
 
 func RoundManagerStoreTest():
 	var roundmanagerinstance = MultiplayerRoundManager.new()
@@ -63,6 +64,9 @@ func registerPlayer(newPlayerInfo):
 	_playerLoaded()
 
 func _onPlayerDisconnected(id):
+	var match_forId = multiplayerRoundManager.getMatch(id, [])
+	if match_forId != null:
+		multiplayerRoundManager.queue_free(match_forId)
 	players.erase(id)
 	playerDisconnected.emit(id)
 	print("someone disconnected")
@@ -146,7 +150,8 @@ func verifyUserId(id : int):
 func terminateSession(id, reason : String):
 	closeSession.rpc_id(id, reason)
 
-@rpc("any_peer") func receiveSenderUsername(username): 
+@rpc("any_peer")
+func receiveSenderUsername(username): 
 	username = username.to_lower()
 	providedUsername.emit(username)
 
@@ -155,26 +160,39 @@ func requestPlayerList():
 	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
 @rpc("any_peer")
-func inviteUser(receiverID, senderUsername):
-	var receiverUsername = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(receiverID)]
-	print("%s sent an invite to %s with id %s" % [senderUsername, receiverUsername, receiverID])
-	receiveInvite.rpc_id(receiverID, senderUsername, multiplayer.get_remote_sender_id())
+func inviteUser(receiverUsername):
+	var id = multiplayer.get_remote_sender_id()
+	if not invites.keys().has(receiverUsername):
+		var senderUsername = AuthManager.getUsername(id)
+		invites[receiverUsername] = senderUsername
+		receiveInvite.rpc_id(AuthManager.loggedInPlayerIds[receiverUsername], senderUsername)
+	else:
+		sendInviteStatus.rpc_id(id,"busy")
 
 @rpc("any_peer")
-func sendInviteStatus(id, status):
-	receiveInviteStatus.rpc_id(id, status)
+func receiveInviteStatus(status):
+	var id = multiplayer.get_remote_sender_id()
+	var receiverUsername = AuthManager.getUsername(id)
+	var senderUsername = invites[receiverUsername]
+	var senderId = AuthManager.loggedInPlayerIds[senderUsername]
+	invites.erase(receiverUsername)
+	if status == "accept" or status == "deny":
+		sendInviteStatus.rpc_id(senderId, receiverUsername, status)
+	if status == "accept":
+		var players_forMatch = [{senderId: senderUsername}, {id: receiverUsername}]
+		multiplayerRoundManager.createMatch(players_forMatch)
 
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
 #@rpc("any_peer") func receiveLobbyList(): pass
 #@rpc("any_peer") func receive_lobby_id(): pass
 @rpc("any_peer") func receiveUserCreationStatus(return_value: bool, username): pass
-@rpc("authority") func notifySuccessfulLogin(): pass
+@rpc("any_peer") func notifySuccessfulLogin(): pass
 @rpc("any_peer") func requestSenderUsername(): pass
-@rpc("authority") func receiveUserKey(keyString): pass 
-@rpc("authority") func receivePlayerList(dict): pass
-@rpc("authority") func receiveInvite(from, id): pass
-@rpc("authority") func receiveInviteStatus(status): pass
+@rpc("any_peer") func receiveUserKey(keyString): pass 
+@rpc("any_peer") func receivePlayerList(dict): pass
+@rpc("any_peer") func receiveInvite(senderUsername): pass
+@rpc("any_peer") func sendInviteStatus(receiverUsername, status): pass
 
 # DEBUG INPUTS
 func _input(ev):

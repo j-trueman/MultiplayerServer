@@ -69,29 +69,15 @@ func getMatch(id, idx : Array):
 				return child
 			else:
 				i += 1
+	return null
 
-@rpc("any_peer")
-func receiveJoinMatch():
-	var playerName = AuthManager.loggedInPlayerIds.keys()[AuthManager.loggedInPlayerIds.values().find(multiplayer.get_remote_sender_id())]
-	print("ReceiveJoinMatch: " + playerName)
-	match players.size():
-		0: 
-			sendJoinMatch.rpc_id(multiplayer.get_remote_sender_id(), true)
-			players.append({multiplayer.get_remote_sender_id() : playerName})
-		1:
-			sendJoinMatch.rpc_id(multiplayer.get_remote_sender_id(), true)
-			players.append({multiplayer.get_remote_sender_id() : playerName})
-			var mrm = MRM.new()
-			mrm.name = "Match " + str(matches_num)
-			mrm.players = players
-			add_child(mrm)
-			mrm.beginMatch()
-			matches_num += 1
-		2:
-			sendJoinMatch(false)
-	
-@rpc("any_peer")
-func sendJoinMatch(success): print("SendJoinMatch: " + str(success))
+func createMatch(players_forMatch):
+	var mrm = MRM.new()
+	mrm.name = "Match " + str(matches_num)
+	mrm.players = players_forMatch
+	add_child(mrm)
+	mrm.beginMatch()
+	matches_num += 1
 
 @rpc("any_peer")
 func receivePlayerInfo():
