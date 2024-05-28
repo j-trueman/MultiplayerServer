@@ -83,6 +83,16 @@ func retractInvite(to):
 func rectractAllInvites(): 
 	inviteManager.retractAllInvites(multiplayer.get_remote_sender_id())
 	
+@rpc("any_peer")
+func getInvites(type):
+	var list
+	match type:
+		"incoming":
+			list = inviteManager.getInboundInvites(multiplayer.get_remote_sender_id())
+		"outgoing":
+			list = inviteManager.getOutboundInvites(multiplayer.get_remote_sender_id())
+	receiveInviteList.rpc_id(multiplayer.get_remote_sender_id(), list)
+	
 # GHOST FUNCTIONS
 @rpc("any_peer") func closeSession(reason): pass
 @rpc("any_peer") func receiveUserCreationStatus(return_value: bool, username): pass
@@ -90,4 +100,5 @@ func rectractAllInvites():
 @rpc("any_peer") func receivePrivateKey(keyString): pass 
 @rpc("any_peer") func receivePlayerList(dict): pass
 @rpc("any_peer") func receiveInvite(from, id): pass
-@rpc("any_peer") func receiveInviteStatus(status): pass
+@rpc("any_peer") func receiveInviteStatus(username, status): pass
+@rpc("any_peer") func receiveInviteList(list): pass

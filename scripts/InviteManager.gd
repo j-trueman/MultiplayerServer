@@ -8,37 +8,41 @@ class Invite:
 	var inviteTo : int
 	var inviteFrom : int
 	var activeInvites : Array
+	var inviteFromUsername
+	var inviteToUsername
 	
 	func _init(from, to):
 		self.inviteFrom = from
 		self.inviteTo = to
+		self.inviteToUsername = AuthManager.loggedInPlayerIds.find_key(inviteTo)
+		self.inviteFromUsername = AuthManager.loggedInPlayerIds.find_key(inviteFrom)
 		self.send()
 	
 	func send():
-		var username = AuthManager.loggedInPlayerIds.find_key(inviteFrom)
-		MultiplayerManager.receiveInvite.rpc_id(inviteTo, username, inviteFrom)
+		MultiplayerManager.receiveInvite.rpc_id(inviteTo, inviteFromUsername, inviteFrom)
 	
 	func accept():
-		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, "accept")
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteFromUsername, "accept")
+		MultiplayerManager.multiplayerRoundManager.createMatch([inviteFrom, inviteTo])
 		
 	func deny():
-		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, "deny")
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteFromUsername, "deny")
 		
 	func cancel():
-		MultiplayerManager.receiveInviteStatus.rpc_id(inviteTo, "cancel")
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteTo, inviteFromUsername, "cancel")
 	
 func getInboundInvites(to):
 	var invitesForPlayer = []
 	for invite in activeInvites:
 		if invite.inviteTo == to:
-			invitesForPlayer.append(invite.inviteFrom)
+			invitesForPlayer.append({invite.inviteFromUsername:"username",invite.inviteFrom:"id"})
 	return invitesForPlayer
 	
-func getOutBoundInvites(from):
+func getOutboundInvites(from):
 	var invitesFromPlayer = []
 	for invite in activeInvites:
 		if invite.inviteFrom == from:
-			invitesFromPlayer.append(invite.inviteTo)
+			invitesFromPlayer.append({invite.inviteToUsername:"username",invite.inviteTo:"id"})
 	return invitesFromPlayer
 
 func acceptInvite(from, to):
@@ -46,6 +50,7 @@ func acceptInvite(from, to):
 		if invite.inviteFrom == from && invite.inviteTo == to:
 			invite.accept()
 			activeInvites.remove_at(activeInvites.find(invite))
+			retractAllInvites(from)
 			return true
 	return false
 
