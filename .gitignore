@@ -3,3 +3,4 @@
 /addons/godot-git-plugin
 authsignatures.db
 addons/godot-sqlite/bin/~libgdsqlite.windows.template_debug.x86_64.dll
+authkeys.db
