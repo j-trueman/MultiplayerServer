@@ -48,9 +48,7 @@ func verifyUserCreds(keyFileData : PackedByteArray):
 
 @rpc("any_peer")
 func requestPlayerList():
-	var list = AuthManager.loggedInPlayerIds.duplicate()
-	list.erase(list.find_key(multiplayer.get_remote_sender_id()))
-	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), list)
+	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
 @rpc("any_peer")
 func requestUserExistsStatus(username : String):
