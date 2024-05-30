@@ -62,6 +62,10 @@ func createMatch(players_forMatch):
 	add_child(mrm)
 	mrm.beginMatch()
 	matches_num += 1
+	
+func eraseMatch(mrm : MRM):
+	mrm.queue_free()
+	matches_num -= 1
 
 @rpc("any_peer")
 func receivePlayerInfo():

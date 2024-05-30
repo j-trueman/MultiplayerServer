@@ -20,7 +20,7 @@ func _ready():
 
 func _createServer():
 	var multiplayerPeer = ENetMultiplayerPeer.new()
-	var error = multiplayerPeer.create_server(2244, 1000)
+	var error = multiplayerPeer.create_server(2095, 1000)
 	if error:
 		return error
 	multiplayer.multiplayer_peer = multiplayerPeer
@@ -80,7 +80,7 @@ func retractInvite(to):
 	inviteManager.retractInvite(multiplayer.get_remote_sender_id(), to)
 	
 @rpc("any_peer") 
-func rectractAllInvites(): 
+func retractAllInvites(): 
 	inviteManager.retractAllInvites(multiplayer.get_remote_sender_id())
 	
 @rpc("any_peer")
