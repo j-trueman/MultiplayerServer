@@ -76,6 +76,7 @@ func _verifyKeyFile(username : String, keyData : String):
 func _loginToUserAccount(username : String):
 	loggedInPlayerIds[username] = multiplayer.get_remote_sender_id()
 	MultiplayerManager.notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id(), username)
+	MultiplayerManager.receivePlayerList.rpc(loggedInPlayerIds)
 	print("USER %s LOGGED IN WITH ID %s" % [username, multiplayer.get_remote_sender_id()])
 
 # Called whenever a session disconnects
