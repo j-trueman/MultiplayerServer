@@ -27,36 +27,57 @@ func _createServer():
 	print("CREATED SERVER")
 
 func terminateSession(id, reason : String):
+	print("%s: %s" % [id, reason])
 	closeSession.rpc_id(id, reason)
+	await get_tree().create_timer(5, false).timeout
+	multiplayer.multiplayer_peer.disconnect_peer(id, true)
 
 @rpc("any_peer", "reliable")
 func requestNewUser(username : String):
 	var key = AuthManager._CreateNewUser(username)
-	if !key:
-		terminateSession(multiplayer.get_remote_sender_id(), "userExists")
+	if typeof(key) != TYPE_STRING:
+		match key:
+			-1:
+				terminateSession(multiplayer.get_remote_sender_id(), "invalidUsername")
+				return
+			-2:
+				terminateSession(multiplayer.get_remote_sender_id(), "userAlreadyExists")
+				return
+			-3:
+				terminateSession(multiplayer.get_remote_sender_id(), "databaseError")
+				return
 	receivePrivateKey.rpc_id(multiplayer.get_remote_sender_id(), key)
 
 @rpc("any_peer")
 func verifyUserCreds(keyFileData : PackedByteArray):
 	var keyFileDataString = keyFileData.get_string_from_utf8().split(":")
+	if len(keyFileDataString) != 2:
+		terminateSession(multiplayer.get_remote_sender_id(), "malformedKey")
+		return
 	var keyData = keyFileDataString[0]
 	var username = keyFileDataString[1]
 	var verified = AuthManager._verifyKeyFile(username, keyData)
-	if !verified:
-		return false
+	if verified != 0:
+		match verified:
+			-1:
+				terminateSession(multiplayer.get_remote_sender_id(), "nonExistentUser")
+				return
+			-2:
+				terminateSession(multiplayer.get_remote_sender_id(), "invalidCreds")
+				return
 	AuthManager._loginToUserAccount(username)
 
 @rpc("any_peer")
 func requestPlayerList():
 	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
-@rpc("any_peer")
-func requestUserExistsStatus(username : String):
-	print("requesting status of " + username)
-	if len(AuthManager._checkUserExists(username.to_lower())) > 0:
-		terminateSession(multiplayer.get_remote_sender_id(), "userExists")
-		return false
-	terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
+#@rpc("any_peer")
+#func requestUserExistsStatus(username : String):
+	#print("requesting status of " + username)
+	#if len(AuthManager._checkUserExists(username.to_lower())) > 0:
+		#terminateSession(multiplayer.get_remote_sender_id(), "userExists")
+		#return false
+	#terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
 
 @rpc("any_peer")
 func createInvite(to):
@@ -100,3 +121,4 @@ func getInvites(type):
 @rpc("any_peer") func receiveInvite(from, id): pass
 @rpc("any_peer") func receiveInviteStatus(username, status): pass
 @rpc("any_peer") func receiveInviteList(list): pass
+@rpc("any_peer") func opponentDisconnect(): pass

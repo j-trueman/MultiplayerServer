@@ -21,14 +21,14 @@ func _ready():
 		database.create_table("users", table)
 
 func _CreateNewUser(username : String):
-	# Make sure username is all lowercase and less than 11 characters
+	# Make sure username is all lowercase and no more than 8 characters
 	username = username.to_lower()
-	if len(username) > 10: 
-		return null
+	if len(username) > 8 || len(username) < 1: 
+		return -1
 	
 	# Return false if user already exists
 	if len(_checkUserExists(username)) > 0: 
-		return null
+		return -2
 	
 	# Generate private key
 	var privateKey = CryptoKey.new()
@@ -36,7 +36,7 @@ func _CreateNewUser(username : String):
 	
 	# Insert user into database
 	if !_InsertToDatabase(username, privateKey.save_to_string().to_utf8_buffer()): 
-		return null
+		return -3
 	
 	# Append username to private key and return this to user for storage
 	var keyString = privateKey.save_to_string() + ":%s" % username
@@ -65,12 +65,11 @@ func _verifyKeyFile(username : String, keyData : String):
 	var keyInDatabase = database.select_rows("users", "username = '%s'" % username, ["key"])
 	# If a key is not returned, the user does not exist
 	if len(keyInDatabase) == 0:
-		print("User does not exist")
-		return false
+		return -1
 	# If the key in the database matches the provided key then the user can be authenticated
 	if keyInDatabase[0].values()[0].get_string_from_utf8() != keyData:
-		return false
-	return true
+		return -2
+	return 0
 
 # Only called if _verifyKeyFile returns true
 func _loginToUserAccount(username : String):
@@ -87,4 +86,14 @@ func _logoutOfUserAccount(sessionID):
 	if found != null:
 		# Remove the player from the list of logged in players
 		loggedInPlayerIds.erase(found)
-		print("SESSIONID %s LOGGED OUT" % sessionID)
+		# If the user was in a match, end it and tell the other player
+		var mrm = get_node("/root/MultiplayerManager/MultiplayerRoundManager")
+		var activeMatch = mrm.getMatch(sessionID)
+		if !activeMatch:
+			print("NO MATCH FOUND\nSESSIONID %s LOGGED OUT" % sessionID)
+			return
+		activeMatch.players.erase(sessionID)
+		if len(activeMatch.players) == 1:
+			MultiplayerManager.opponentDisconnect.rpc_id(activeMatch.players[0])
+		mrm.eraseMatch(activeMatch)
+		print("ENDED MATCH\nSESSIONID %s LOGGED OUT" % sessionID)
