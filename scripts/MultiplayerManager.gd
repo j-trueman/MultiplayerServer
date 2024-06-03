@@ -48,7 +48,7 @@ func requestNewUser(username : String):
 				return
 	receivePrivateKey.rpc_id(multiplayer.get_remote_sender_id(), key)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func verifyUserCreds(keyFileData : PackedByteArray):
 	var keyFileDataString = keyFileData.get_string_from_utf8().split(":")
 	if len(keyFileDataString) != 2:
@@ -67,11 +67,11 @@ func verifyUserCreds(keyFileData : PackedByteArray):
 				return
 	AuthManager._loginToUserAccount(username)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func requestPlayerList():
 	receivePlayerList.rpc_id(multiplayer.get_remote_sender_id(), AuthManager.loggedInPlayerIds)
 	
-#@rpc("any_peer")
+#@rpc("any_peer", "reliable")
 #func requestUserExistsStatus(username : String):
 	#print("requesting status of " + username)
 	#if len(AuthManager._checkUserExists(username.to_lower())) > 0:
@@ -79,30 +79,30 @@ func requestPlayerList():
 		#return false
 	#terminateSession(multiplayer.get_remote_sender_id(), "nonexistentUser")
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func createInvite(to):
 	var invite = inviteManager.Invite.new(multiplayer.get_remote_sender_id(), to)
 	inviteManager.activeInvites.append(invite)
 	
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func acceptInvite(from):
 	if !inviteManager.acceptInvite(from, multiplayer.get_remote_sender_id()):
 		print("This user does not have an invite from %s" % from)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func denyInvite(from):
 	if !inviteManager.denyInvite(from, multiplayer.get_remote_sender_id()):
 		print("This user does not have an invite from %s" % from)
 		
-@rpc("any_peer") 
+@rpc("any_peer", "reliable") 
 func retractInvite(to): 
 	inviteManager.retractInvite(multiplayer.get_remote_sender_id(), to)
 	
-@rpc("any_peer") 
+@rpc("any_peer", "reliable") 
 func retractAllInvites(): 
 	inviteManager.retractAllInvites(multiplayer.get_remote_sender_id())
 	
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func getInvites(type):
 	var list
 	match type:
@@ -113,12 +113,12 @@ func getInvites(type):
 	receiveInviteList.rpc_id(multiplayer.get_remote_sender_id(), list)
 	
 # GHOST FUNCTIONS
-@rpc("any_peer") func closeSession(reason): pass
-@rpc("any_peer") func receiveUserCreationStatus(return_value: bool, username): pass
-@rpc("any_peer") func notifySuccessfulLogin(username : String): pass
-@rpc("any_peer") func receivePrivateKey(keyString): pass 
-@rpc("any_peer") func receivePlayerList(dict): pass
-@rpc("any_peer") func receiveInvite(from, id): pass
-@rpc("any_peer") func receiveInviteStatus(username, status): pass
-@rpc("any_peer") func receiveInviteList(list): pass
-@rpc("any_peer") func opponentDisconnect(): pass
+@rpc("any_peer", "reliable") func closeSession(reason): pass
+@rpc("any_peer", "reliable") func receiveUserCreationStatus(return_value: bool, username): pass
+@rpc("any_peer", "reliable") func notifySuccessfulLogin(username : String): pass
+@rpc("any_peer", "reliable") func receivePrivateKey(keyString): pass 
+@rpc("any_peer", "reliable") func receivePlayerList(dict): pass
+@rpc("any_peer", "reliable") func receiveInvite(from, id): pass
+@rpc("any_peer", "reliable") func receiveInviteStatus(username, status): pass
+@rpc("any_peer", "reliable") func receiveInviteList(list): pass
+@rpc("any_peer", "reliable") func opponentDisconnect(): pass

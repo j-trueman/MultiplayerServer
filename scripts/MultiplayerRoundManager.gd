@@ -67,7 +67,7 @@ func eraseMatch(mrm : MRM):
 	mrm.queue_free()
 	matches_num -= 1
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receivePlayerInfo():
 	print("calling")
 	var mrm = getMatch(multiplayer.get_remote_sender_id())
@@ -76,7 +76,7 @@ func receivePlayerInfo():
 		return
 	sendPlayerInfo.rpc_id(multiplayer.get_remote_sender_id(), mrm.players)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendPlayerInfo(players): pass
 
 func beginMatch():
@@ -140,7 +140,7 @@ func pickItems():
 			itemAmounts_available[i][item_forPlayer] = newAmt
 	get_parent().sendItems.rpc(itemsForPlayers)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receiveLoadInfo():
 	print("ReceiveLoadInfo")
 	var mrm = getMatch(multiplayer.get_remote_sender_id())
@@ -149,20 +149,20 @@ func receiveLoadInfo():
 	sendLoadInfo.rpc_id(multiplayer.get_remote_sender_id(), mrm.roundIdx, mrm.loadIdx, mrm.currentPlayerTurn, \
 		mrm.healthPlayers, mrm.totalShells, mrm.liveCount)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendLoadInfo(currentPlayerTurn, healthPlayers, totalShells, liveCount): pass
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receiveItems():
 	print("ReceiveItems")
 	var mrm = getMatch(multiplayer.get_remote_sender_id())
 	print("SendItems: " + str(mrm.itemsForPlayers))
 	sendItems.rpc_id(multiplayer.get_remote_sender_id(), mrm.itemsForPlayers)
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendItems(itemsForPlayers): pass
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receiveItemsOnTable(itemTableIdxArray):
 	print("ReceiveItemsOnTable: " + str(itemTableIdxArray))
 	var mrm = getMatch(multiplayer.get_remote_sender_id())
@@ -179,10 +179,10 @@ func receiveItemsOnTable(itemTableIdxArray):
 			sendItemsOnTable.rpc_id(player, mrm.itemsOnTable)
 		mrm.itemsOnTable_ready = 0
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendItemsOnTable(itemsOnTable): pass
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receiveActionValidation(action):
 	print("ReceiveActionValidation: " + action)
 	var action_temp = action
@@ -297,13 +297,13 @@ func doItem(action_temp, playerIdx):
 	newAmt = [newAmt[0], newAmt[1] + 1] if bool(mode) else [newAmt[0] + 1, newAmt[1]]
 	itemAmounts_available[playerIdx][action] = newAmt
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendActionValidation(action, result): pass
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendTimeoutAdrenaline(): pass
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func receiveActionReady():
 	var mrm = getMatch(multiplayer.get_remote_sender_id())
 	var playerIdx = mrm.players.find(multiplayer.get_remote_sender_id())
@@ -318,5 +318,5 @@ func receiveActionReady():
 		mrm.actionReady = 0
 		mrm.actionReady_first = 0
 
-@rpc("any_peer")
+@rpc("any_peer", "reliable")
 func sendActionReady(): pass

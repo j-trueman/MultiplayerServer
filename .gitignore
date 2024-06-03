@@ -6,3 +6,4 @@ addons/godot-sqlite/bin/~libgdsqlite.windows.template_debug.x86_64.dll
 authkeys.db
 export_presets.cfg
 authkeys.db
+server.x86_64
