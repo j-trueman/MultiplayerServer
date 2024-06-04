@@ -23,7 +23,7 @@ func _ready():
 func _CreateNewUser(username : String):
 	# Make sure username is all lowercase and no more than 8 characters
 	username = username.to_lower()
-	if len(username) > 8 || len(username) < 1: 
+	if len(username) > 10 || len(username) < 1: 
 		return -1
 	
 	# Return false if user already exists
