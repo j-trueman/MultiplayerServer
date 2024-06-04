@@ -204,7 +204,7 @@ func receiveActionValidation(action):
 	if action.length() == 1:
 		action = mrm.itemsOnTable[playerIdx][int(action)]
 	if playerIdx != mrm.currentPlayerTurn or validActions.find(action) < 0:
-		action = "invalid"
+		action_temp = "invalid"
 	else: match action:
 		"pickup shotgun": pass
 		"shoot self":

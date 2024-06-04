@@ -22,7 +22,7 @@ class Invite:
 		MultiplayerManager.receiveInvite.rpc_id(inviteTo, inviteFromUsername, inviteFrom)
 	
 	func accept():
-		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteFromUsername, "accept")
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteToUsername, "accept")
 		MultiplayerManager.multiplayerRoundManager.createMatch([inviteFrom, inviteTo])
 		
 	func deny():
