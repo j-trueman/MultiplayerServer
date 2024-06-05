@@ -1,5 +1,7 @@
 extends Node
 
+var version = "0.2.0"
+
 const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
 const InviteManager = preload("res://scripts/InviteManager.gd")
 var multiplayerRoundManager
@@ -49,7 +51,10 @@ func requestNewUser(username : String):
 	receivePrivateKey.rpc_id(multiplayer.get_remote_sender_id(), key)
 
 @rpc("any_peer", "reliable")
-func verifyUserCreds(keyFileData : PackedByteArray):
+func verifyUserCreds(keyFileData : PackedByteArray, client_version : String):
+	if client_version != version:
+		terminateSession(multiplayer.get_remote_sender_id(), "outdatedClient")
+		return
 	var keyFileDataString = keyFileData.get_string_from_utf8().split(":")
 	if len(keyFileDataString) != 2:
 		terminateSession(multiplayer.get_remote_sender_id(), "malformedKey")
@@ -112,6 +117,15 @@ func getInvites(type):
 			list = inviteManager.getOutboundInvites(multiplayer.get_remote_sender_id())
 	receiveInviteList.rpc_id(multiplayer.get_remote_sender_id(), list)
 	
+@rpc("any_peer", "reliable")
+func sendChat(message):
+	var id = multiplayer.get_remote_sender_id()
+	var mrm = multiplayerRoundManager.getMatch(id)
+	if mrm:
+		var receiver = mrm.players.duplicate()
+		receiver.erase(id)
+		receiveChat.rpc_id(receiver.front(), message.substr(0,200))
+
 # GHOST FUNCTIONS
 @rpc("any_peer", "reliable") func closeSession(reason): pass
 @rpc("any_peer", "reliable") func receiveUserCreationStatus(return_value: bool, username): pass
@@ -122,3 +136,4 @@ func getInvites(type):
 @rpc("any_peer", "reliable") func receiveInviteStatus(username, status): pass
 @rpc("any_peer", "reliable") func receiveInviteList(list): pass
 @rpc("any_peer", "reliable") func opponentDisconnect(): pass
+@rpc("any_peer", "reliable") func receiveChat(message): pass

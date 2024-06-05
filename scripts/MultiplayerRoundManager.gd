@@ -138,7 +138,8 @@ func pickItems():
 			var newAmt = itemAmounts_available[i][item_forPlayer]
 			newAmt = [newAmt[0], newAmt[1] - 1] if bool(mode) else [newAmt[0] - 1, newAmt[1]]
 			itemAmounts_available[i][item_forPlayer] = newAmt
-	get_parent().sendItems.rpc(itemsForPlayers)
+	for player in players:
+		get_parent().sendItems.rpc_id(player, itemsForPlayers)
 
 @rpc("any_peer", "reliable")
 func receiveLoadInfo():
