@@ -56,12 +56,13 @@ func getMatch(id):
 	return false
 
 func createMatch(players_forMatch):
-	var mrm = MRM.new()
-	mrm.name = "Match " + str(matches_num)
-	mrm.players = players_forMatch
-	add_child(mrm)
-	mrm.beginMatch()
-	matches_num += 1
+	if not (getMatch(players_forMatch.front()) or getMatch(players_forMatch.back())):
+		var mrm = MRM.new()
+		mrm.name = "Match " + str(matches_num)
+		mrm.players = players_forMatch
+		add_child(mrm)
+		mrm.beginMatch()
+		matches_num += 1
 	
 func eraseMatch(mrm : MRM):
 	mrm.queue_free()

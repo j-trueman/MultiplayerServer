@@ -86,8 +86,9 @@ func requestPlayerList():
 
 @rpc("any_peer", "reliable")
 func createInvite(to):
-	var invite = inviteManager.Invite.new(multiplayer.get_remote_sender_id(), to)
-	inviteManager.activeInvites.append(invite)
+	if not multiplayerRoundManager.getMatch(to):
+		var invite = inviteManager.Invite.new(multiplayer.get_remote_sender_id(), to)
+		inviteManager.activeInvites.append(invite)
 	
 @rpc("any_peer", "reliable")
 func acceptInvite(from):
