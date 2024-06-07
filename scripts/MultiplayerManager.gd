@@ -1,6 +1,6 @@
 extends Node
 
-var version = "0.2.1"
+var version = "0.2.2"
 
 const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
 const InviteManager = preload("res://scripts/InviteManager.gd")

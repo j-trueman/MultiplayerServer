@@ -227,7 +227,7 @@ func receiveActionValidation(action):
 			if shell == 1:
 				var damage = 2 if mrm.isSawed else 1
 				mrm.healthPlayers[opponentIdx] -= damage
-			if mrm.isHandcuffed[opponentIdx] != 2 or shellArray.is_empty():
+			if mrm.isHandcuffed[opponentIdx] != 2 or mrm.shellArray.is_empty():
 				mrm.currentPlayerTurn = int(not playerIdx)
 			if mrm.isHandcuffed[opponentIdx] > 0:
 				mrm.isHandcuffed[opponentIdx] -= 1
