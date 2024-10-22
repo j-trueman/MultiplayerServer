@@ -117,9 +117,9 @@ func createMatch(players_forMatch):
 			mrm.actionReady = 1
 			mrm.bruteforceID = -1
 			mrm.wager = 70
-			var process = "res://dealer.exe" if OS.get_name() == "Windows" \
-				else "res://dealer.x86_64"
-			OS.create_process(ProjectSettings.globalize_path(process),[])
+			var process = ProjectSettings.globalize_path("res://dealer.exe") \
+				if OS.get_name() == "Windows" else "./dealer.x86_64"
+			OS.create_process(process,[])
 		matches_num += 1
 		mrm.beginMatch()
 	

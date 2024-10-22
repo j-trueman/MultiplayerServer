@@ -9,3 +9,6 @@ authkeys.db
 server.x86_64
 server.exe
 authkeys.db
+libgdsqlite.linux.template_release.x86_64.so
+libgdsqlite.windows.template_release.x86_64.dll
+server.properties
