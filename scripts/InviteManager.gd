@@ -14,8 +14,8 @@ class Invite:
 	func _init(from, to):
 		self.inviteFrom = from
 		self.inviteTo = to
-		self.inviteToUsername = AuthManager.loggedInPlayerIds.find_key(inviteTo)
-		self.inviteFromUsername = AuthManager.loggedInPlayerIds.find_key(inviteFrom)
+		self.inviteToUsername = AuthManager.loggedInPlayers[inviteTo].username
+		self.inviteFromUsername = AuthManager.loggedInPlayers[inviteFrom].username
 		self.send()
 	
 	func send():
@@ -23,10 +23,10 @@ class Invite:
 	
 	func accept():
 		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteToUsername, "accept")
-		MultiplayerManager.multiplayerRoundManager.createMatch([inviteFrom, inviteTo])
+		MultiplayerManager.mrm.createMatch([inviteFrom, inviteTo])
 		
 	func deny():
-		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteFromUsername, "deny")
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteToUsername, "deny")
 		
 	func cancel():
 		MultiplayerManager.receiveInviteStatus.rpc_id(inviteTo, inviteFromUsername, "cancel")
@@ -54,7 +54,7 @@ func acceptInvite(from, to):
 			return true
 	return false
 
-func denyInvite(from, to):
+func denyInvite(from):
 	for invite in activeInvites:
 		if invite.inviteFrom == from:
 			invite.deny()
@@ -70,8 +70,8 @@ func retractInvite(from, to):
 			return true
 	return false
 
-func retractAllInvites(from):
+func retractAllInvites(from, dual = false):
 	for invite in activeInvites:
-		if invite.inviteFrom == from:
+		if invite.inviteFrom == from or (dual and invite.inviteTo == from):
 			invite.cancel()
 			activeInvites.remove_at(activeInvites.find(invite))

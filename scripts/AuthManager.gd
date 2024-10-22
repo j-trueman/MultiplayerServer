@@ -1,8 +1,9 @@
 extends Node
 
 var database : SQLite
-var loggedInPlayerIds = {}
+var loggedInPlayers = {}
 var crypto = Crypto.new()
+var dealerKey
 
 func _ready():
 	multiplayer.peer_disconnected.connect(_logoutOfUserAccount)
@@ -16,9 +17,18 @@ func _ready():
 		print("TABLE DOES NOT EXIST. CREATING...")
 		var table = {
 			"username" : {"data_type" : "text", "primary_key":true, "not_null": true},
-			"key" : {"data_type": "blob", "not_null":true}
+			"key" : {"data_type": "blob", "not_null":true},
+			"score" : {"data_type": "int", "not_null":true}
 		}
 		database.create_table("users", table)
+	
+	var dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.WRITE_READ)
+	if !dealerKeyFile:
+		dealerKey = crypto.generate_rsa(4096)
+		dealerKeyFile.store_string(dealerKey.save_to_string())
+	else:
+		dealerKey = dealerKeyFile.get_buffer(dealerKeyFile.get_length())
+	dealerKeyFile.close()
 
 func _CreateNewUser(username : String):
 	# Make sure username is all lowercase and no more than 8 characters
@@ -31,8 +41,7 @@ func _CreateNewUser(username : String):
 		return -2
 	
 	# Generate private key
-	var privateKey = CryptoKey.new()
-	privateKey = crypto.generate_rsa(4096)
+	var privateKey = crypto.generate_rsa(4096)
 	
 	# Insert user into database
 	if !_InsertToDatabase(username, privateKey.save_to_string().to_utf8_buffer()): 
@@ -52,6 +61,7 @@ func _InsertToDatabase(username : String, privateKey : PackedByteArray) -> bool:
 	var data = {
 		"username" : username,
 		"key" : privateKey,
+		"score" : 0
 	}
 	# Attempt to insert new user data into database
 	var success = database.insert_row("users", data)
@@ -73,27 +83,45 @@ func _verifyKeyFile(username : String, keyData : String):
 
 # Only called if _verifyKeyFile returns true
 func _loginToUserAccount(username : String):
-	loggedInPlayerIds[username] = multiplayer.get_remote_sender_id()
-	MultiplayerManager.notifySuccessfulLogin.rpc_id(multiplayer.get_remote_sender_id(), username)
-	MultiplayerManager.receivePlayerList.rpc(loggedInPlayerIds)
-	print("USER %s LOGGED IN WITH ID %s" % [username, multiplayer.get_remote_sender_id()])
+	var id = multiplayer.get_remote_sender_id()
+	var score = database.select_rows("users", "username = '%s'" % username, \
+		["score"]).front().score
+	loggedInPlayers[id] = {"username": username, \
+		"status": false, "score": score}
+	MultiplayerManager.notifySuccessfulLogin.rpc_id(id, username)
+	print("USER %s LOGGED IN WITH ID %s" % [username, id])
 
 # Called whenever a session disconnects
 func _logoutOfUserAccount(sessionID):
 	# Make sure the user is logged in before trying to log them out
 	# (This avoids a weird bug where the server still tries to log a user out even if their initial connection fails)
-	var found = loggedInPlayerIds.find_key(sessionID)
+	var found = loggedInPlayers.get(sessionID)
 	if found != null:
 		# Remove the player from the list of logged in players
-		loggedInPlayerIds.erase(found)
+		loggedInPlayers.erase(sessionID)
+		MultiplayerManager.inviteManager.retractAllInvites(sessionID, true)
 		# If the user was in a match, end it and tell the other player
-		var mrm = get_node("/root/MultiplayerManager/MultiplayerRoundManager")
-		var activeMatch = mrm.getMatch(sessionID)
-		if !activeMatch:
-			print("NO MATCH FOUND\nSESSIONID %s LOGGED OUT" % sessionID)
-			return
-		activeMatch.players.erase(sessionID)
-		if len(activeMatch.players) == 1:
-			MultiplayerManager.opponentDisconnect.rpc_id(activeMatch.players[0])
-		mrm.eraseMatch(activeMatch)
-		print("ENDED MATCH\nSESSIONID %s LOGGED OUT" % sessionID)
+		_killMRM(sessionID)
+		print("SESSIONID %s LOGGED OUT" % sessionID)
+		
+func _killMRM(sessionID):
+	var mrm = get_node("/root/MultiplayerManager/MultiplayerRoundManager")
+	var activeMatch = mrm.getMatch(sessionID)
+	if !activeMatch:
+		print("NO MATCH FOUND")
+		return
+	if not activeMatch.end:
+		activeMatch.scores[int(not activeMatch.players.find(sessionID))] = 2
+		activeMatch.awardWager()
+	activeMatch.players.erase(sessionID)
+	if len(activeMatch.players) == 1 and activeMatch.players[0] > 0:
+		MultiplayerManager.opponentDisconnect.rpc_id(activeMatch.players[0])
+	mrm.eraseMatch(activeMatch)
+	print("ENDED MATCH")
+
+func awardWager(sessionID, wager):
+	if sessionID > 0:
+		var player = loggedInPlayers[sessionID]
+		player.score += wager
+		database.update_rows("users", "username = '%s'" % player.username, \
+			{"score": player.score})
