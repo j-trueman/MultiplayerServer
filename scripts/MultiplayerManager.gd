@@ -1,7 +1,7 @@
 extends Node
 
 const SCORE_MAX = 999999999999
-const VERSION = "0.3.1"
+const VERSION = "0.3.2"
 var port = 2095
 var maxClients = 1000
 var dealerMode = true
@@ -222,8 +222,9 @@ func startDealer():
 @rpc("any_peer", "reliable")
 func requestLeaderboard():
 	var id = multiplayer.get_remote_sender_id()
-	var list = AuthManager.database.select_rows("users", "score > 0", ["username", "score"])
-	receiveLeaderboard.rpc_id(id, list)
+	AuthManager.database.query("SELECT username, score FROM users "+\
+		"WHERE score > 0 ORDER BY score DESC LIMIT 10")
+	receiveLeaderboard.rpc_id(id, AuthManager.database.query_result)
 
 # GHOST FUNCTIONS
 @rpc("any_peer", "reliable") func closeSession(_reason): pass

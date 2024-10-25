@@ -73,5 +73,6 @@ func retractInvite(from, to):
 func retractAllInvites(from, dual = false):
 	for invite in activeInvites:
 		if invite.inviteFrom == from or (dual and invite.inviteTo == from):
-			invite.cancel()
+			if AuthManager.loggedInPlayers.has(invite.inviteTo):
+				invite.cancel()
 			activeInvites.remove_at(activeInvites.find(invite))

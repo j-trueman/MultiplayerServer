@@ -9,7 +9,7 @@ var settings = {
 	"userLimitDaily": 500
 }
 
-const intro = 	"You are a ruthless, mysterious male Dealer in a game of Buckshot Roulette. " + \
+var intro = 	"You are a ruthless, mysterious male Dealer in a game of Buckshot Roulette. " + \
 				"You are a floating head and hands. You are terse, not casual, " + \
 				"but still engaging in conversation. " + \
 				"Shoot yourself with a blank and you go again; shoot yourself or your opponent " + \
@@ -42,6 +42,17 @@ func initDB():
 			"response" : {"data_type" : "text"}
 		}
 		database.create_table("chat", table)
+	
+	var promptFile = FileAccess.open("res://prompt.txt", FileAccess.READ_WRITE)
+	if promptFile == null:
+		promptFile = FileAccess.open("res://prompt.txt", FileAccess.WRITE_READ)
+	var prompt = promptFile.get_line()
+	if prompt.is_empty():
+		promptFile.store_line(intro)
+	else:
+		intro = prompt
+	promptFile.close()
+	print(intro)
 
 func moderate(input):
 	var json = JSON.stringify({"input": input})

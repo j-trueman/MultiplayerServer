@@ -190,7 +190,7 @@ func beginLoad():
 		for shell in shellArray: dealer_knownShells.append(false)
 		dealer_roundIdx = roundIdx
 		dealer_loadIdx = loadIdx
-		dealer_wait = 2 if roundIdx < 2 else 3
+		dealer_wait = 3 if (roundIdx == 2 and loadIdx == 0) else 2
 	
 	pickItems()
 
@@ -297,8 +297,8 @@ func receiveActionValidation(action):
 		print("SendActionValidation: " + action_temp + ", " + str(result))
 		for player in mrm.players:
 			mrm.performRPC("action", player, action_temp, result)
-		if mrm.currentPlayerTurn == 0 and mrm.dealer and dealer_savedAction.is_empty():
-				mrm.dealer_action_send()
+		if mrm.currentPlayerTurn == 0 and mrm.dealer:
+			mrm.dealer_action_send()
 
 func doAction(action, action_temp, playerIdx):
 	var result
@@ -362,11 +362,14 @@ func doAction(action, action_temp, playerIdx):
 			else: healthPlayers[playerIdx] += 2
 		"burner phone":
 			doItem(action_temp, playerIdx)
-			var rand = randi_range(1,shellArray.size()-1)
-			if rand == 7: rand -= 1
-			result = rand if shellArray[rand] else -rand
-			if dealer and not bool(playerIdx):
-				dealer_knownShells[rand] = true
+			if shellArray.size() > 1:
+				var rand = randi_range(1,shellArray.size()-1)
+				if rand == 7: rand -= 1
+				result = rand if shellArray[rand] else -rand
+				if dealer and not bool(playerIdx):
+					dealer_knownShells[rand] = true
+			else:
+				result = 0
 		"adrenaline":
 			doItem(action_temp, playerIdx)
 			isStealing = true
@@ -587,12 +590,14 @@ func dealerChat(message):
 				var status = "[Dealer " + str(healthPlayers.front()) + "/Player " + \
 					str(healthPlayers.back()) + ", Live " + str(shellArray.count(1)) + \
 					"/Blank " + str(shellArray.count(0)) + ", " + knownShell + ", " + turn + "]"
+				while dealerChat_history.size() > 18:
+					dealerChat_history.pop_front()
 				var dealerChat_toSubmit = dealerChat_history.duplicate(true)
 				dealerChat_toSubmit.append({"role": "system", "content": status})
 				dealerChat_toSubmit.append({"role": "user", "content": message})
 				dealerChat_history.append({"role": "user", "content": message})
-				var response = await MultiplayerManager.chatgpt.complete(\
-					username, dealerChat_toSubmit)
+				var response = await MultiplayerManager.chatgpt.complete(username, dealerChat_toSubmit)
 				if not response.is_empty():
+					dealerChat_history.append({"role": "assistant", "content": response})
 					MultiplayerManager.receiveChat.rpc_id(players.back(), response)
 		dealerChat_busy = false
