@@ -33,7 +33,7 @@ var scores
 var currentPlayerTurn
 var roundIdx
 var loadIdx
-var shellArray
+var shellArray = []
 var totalShells
 var liveCount
 var health
@@ -69,6 +69,9 @@ var dealer_wait = 2
 var dealer_end = 0
 var dealer_table
 var bruteforceID = 0
+
+var dealerChat_history = []
+var dealerChat_busy = false
 
 func _ready():
 	var parent = get_parent()
@@ -108,8 +111,10 @@ func createMatch(players_forMatch):
 	if not (getMatch(players_forMatch.front()) or getMatch(players_forMatch.back())):
 		var mrm = MRM.new()
 		mrm.name = "Match " + str(matches_num)
-		for player in players_forMatch:
-			if player > 0:
+		if players_forMatch.has(0):
+			mrm.dealer = true
+		else:
+			for player in players_forMatch:
 				AuthManager.loggedInPlayers[player].status = true
 		mrm.players = players_forMatch
 		add_child(mrm)
@@ -143,9 +148,7 @@ func receivePlayerInfo():
 func sendPlayerInfo(_players): pass
 
 func beginMatch():
-	if players.has(0):
-		dealer = true
-	else:
+	if not dealer:
 		players.shuffle()
 	scores = [0,0]
 	roundIdx = 0
@@ -570,3 +573,26 @@ func requestCountdown():
 
 @rpc("any_peer", "reliable")
 func alertCountdown(_timeout): pass
+
+func dealerChat(message):
+	if not dealerChat_busy:
+		dealerChat_busy = true
+		var username = AuthManager.loggedInPlayers[players.back()].username
+		if MultiplayerManager.chatgpt.checkRateLimit(username):
+			var vibeCheck = await MultiplayerManager.chatgpt.moderate(message)
+			if vibeCheck:
+				var knownShell = ("is " + "Live" if bool(shellArray.front()) else "Blank") \
+					if dealer_knownShells.front() else "?"
+				var turn = "player's turn" if bool(currentPlayerTurn) else "Dealer's turn"
+				var status = "[Dealer " + str(healthPlayers.front()) + "/Player " + \
+					str(healthPlayers.back()) + ", Live " + str(shellArray.count(1)) + \
+					"/Blank " + str(shellArray.count(0)) + ", " + knownShell + ", " + turn + "]"
+				var dealerChat_toSubmit = dealerChat_history.duplicate(true)
+				dealerChat_toSubmit.append({"role": "system", "content": status})
+				dealerChat_toSubmit.append({"role": "user", "content": message})
+				dealerChat_history.append({"role": "user", "content": message})
+				var response = await MultiplayerManager.chatgpt.complete(\
+					username, dealerChat_toSubmit)
+				if not response.is_empty():
+					MultiplayerManager.receiveChat.rpc_id(players.back(), response)
+		dealerChat_busy = false

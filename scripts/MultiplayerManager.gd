@@ -1,20 +1,21 @@
 extends Node
 
 const SCORE_MAX = 999999999999
-const VERSION = "0.3.0"
+const VERSION = "0.3.1"
 var port = 2095
 var maxClients = 1000
 var dealerMode = true
+var chatgptMode = false
 
-const MultiplayerRoundManager = preload("res://scripts/MultiplayerRoundManager.gd")
-var mrm : MultiplayerRoundManager
+var mrm : MRM
+var chatgpt : ChatGPTManager
 var inviteManager : InviteManager
 var regex : RegEx
 
 func _ready():
 	multiplayer.server_relay = false
 	
-	mrm = MultiplayerRoundManager.new()
+	mrm = MRM.new()
 	mrm.name = "MultiplayerRoundManager"
 	add_child(mrm)
 	
@@ -22,25 +23,38 @@ func _ready():
 	inviteManager.name = "InviteManager"
 	add_child(inviteManager)
 	
+	chatgpt = ChatGPTManager.new()
+	chatgpt.name = "ChatGPTManager"
+	add_child(chatgpt)
+	
 	var configFile = ConfigFile.new()
 	var configPath = "res://server.properties"
 	if configFile.load(configPath) != OK or configFile.get_sections().is_empty():
 		configFile.set_value("server", "port", port)
 		configFile.set_value("server", "maxClients", maxClients)
 		configFile.set_value("server", "dealerMode", dealerMode)
+		configFile.set_value("server", "chatgptMode", dealerMode and chatgptMode)
 		for setting in mrm.settings.keys():
 			configFile.set_value("round", setting, mrm.settings[setting])
 		for item in mrm.itemAmounts.keys():
 			configFile.set_value("items", item.to_camel_case(), mrm.itemAmounts[item])
+		for setting in chatgpt.settings.keys():
+			configFile.set_value("chatgpt", setting, chatgpt.settings[setting])
 		configFile.save(configPath)
 	else:
 		port = configFile.get_value("server", "port")
 		maxClients = configFile.get_value("server", "maxClients")
 		dealerMode = configFile.get_value("server", "dealerMode")
+		chatgptMode = dealerMode and configFile.get_value("server", "chatgptMode")
 		for key in configFile.get_section_keys("round"):
 			mrm.settings[key] = configFile.get_value("round", key)
 		for key in configFile.get_section_keys("items"):
 			mrm.itemAmounts[key.capitalize().to_lower()] = configFile.get_value("items", key)
+		for key in configFile.get_section_keys("chatgpt"):
+			chatgpt.settings[key] = configFile.get_value("chatgpt", key)
+	
+	if chatgptMode:
+		chatgpt.initDB()
 	
 	regex = RegEx.new()
 	regex.compile("^[A-Za-z0-9 ~!@#%&_=:;'<>,/\\-\\$\\^\\*\\(\\)\\+\\{\\}\\|\\[\\]\\.\\?\\\"]+$")
@@ -129,7 +143,8 @@ func requestPlayerList():
 func createInvite(toID):
 	var id = multiplayer.get_remote_sender_id()
 	var inviteTo = AuthManager.loggedInPlayers[toID]
-	if not mrm.getMatch(toID):
+	var found = mrm.getMatch(toID)
+	if not found or found.dealer:
 		if dealerMode and toID == 0:
 			await get_tree().create_timer(1).timeout
 			receiveInviteStatus.rpc_id(id, "dealer", "accept")
@@ -178,6 +193,8 @@ func sendChat(message):
 			receiver.erase(id)
 			if receiver.front() > 0:
 				receiveChat.rpc_id(receiver.front(), message.substr(0,200))
+			elif chatgptMode:
+				target.dealerChat(message.substr(0,200))
 
 @rpc("any_peer", "reliable")
 func verifyDealer(key, playerID):
@@ -202,6 +219,12 @@ func startDealer():
 			child.dealer_action_send()
 			break
 
+@rpc("any_peer", "reliable")
+func requestLeaderboard():
+	var id = multiplayer.get_remote_sender_id()
+	var list = AuthManager.database.select_rows("users", "score > 0", ["username", "score"])
+	receiveLeaderboard.rpc_id(id, list)
+
 # GHOST FUNCTIONS
 @rpc("any_peer", "reliable") func closeSession(_reason): pass
 @rpc("any_peer", "reliable") func receiveUserCreationStatus(_return_value: bool, _username): pass
@@ -211,6 +234,7 @@ func startDealer():
 @rpc("any_peer", "reliable") func receiveInvite(_from, _id): pass
 @rpc("any_peer", "reliable") func receiveInviteStatus(_username, _status): pass
 @rpc("any_peer", "reliable") func receiveInviteList(_list): pass
+@rpc("any_peer", "reliable") func receiveLeaderboard(_list): pass
 @rpc("any_peer", "reliable") func opponentDisconnect(): pass
 @rpc("any_peer", "reliable") func receiveChat(_message): pass
 @rpc("any_peer", "reliable") func linkDealer(_id): pass
