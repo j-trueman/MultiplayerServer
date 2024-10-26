@@ -1,7 +1,7 @@
 extends Node
 
 const SCORE_MAX = 999999999999
-const VERSION = "0.3.2"
+const VERSION = "0.3.3"
 var port = 2095
 var maxClients = 1000
 var dealerMode = true
@@ -86,6 +86,10 @@ func terminateSession(id, reason : String):
 func requestNewUser(username : String):
 	var id = multiplayer.get_remote_sender_id()
 	var key
+	while username.length() > 0 and username.begins_with(" "):
+		username = username.substr(1,username.length()-1)
+	while username.length() > 0 and username.ends_with(" "):
+		username = username.substr(0,username.length()-1)
 	if isValidString(username):
 		key = AuthManager._CreateNewUser(username)
 	else:
@@ -203,8 +207,8 @@ func verifyDealer(key, playerID):
 	if key == AuthManager.dealerKey:
 		print("dealer connected")
 		for child in get_node("MultiplayerRoundManager").get_children():
-			if (playerID == 0 and child.bruteforceID == -1) or child.players[1] == playerID:
-				child.bruteforceID = id
+			if (playerID == 0 and child.dealer_bruteforceID == -1) or child.players[1] == playerID:
+				child.dealer_bruteforceID = id
 				linkDealer.rpc_id(id, child.players[1])
 				found = true
 				break
@@ -215,7 +219,7 @@ func verifyDealer(key, playerID):
 func startDealer():
 	var id = multiplayer.get_remote_sender_id()
 	for child in get_node("MultiplayerRoundManager").get_children():
-		if child.bruteforceID == id:
+		if child.dealer_bruteforceID == id:
 			child.dealer_action_send()
 			break
 

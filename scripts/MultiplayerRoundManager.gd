@@ -58,6 +58,7 @@ var matches_num = 1
 var wager = 0
 
 var dealer = false
+var dealer_pid = 0
 var dealer_action = 0
 var dealer_shotgunFlag = false
 var dealer_roundIdx = -1
@@ -68,7 +69,7 @@ var dealer_ready = false
 var dealer_wait = 2
 var dealer_end = 0
 var dealer_table
-var bruteforceID = 0
+var dealer_bruteforceID = 0
 
 var dealerChat_history = []
 var dealerChat_busy = false
@@ -96,10 +97,6 @@ func _process(delta):
 			timerRunning = false
 			timerRunning = 0.0
 
-func _exit_tree():
-	if bruteforceID > 0:
-		multiplayer.multiplayer_peer.disconnect_peer(bruteforceID)
-
 func getMatch(id):
 	if id > 0:
 		for child in get_children():
@@ -120,17 +117,19 @@ func createMatch(players_forMatch):
 		add_child(mrm)
 		if not players_forMatch.front() > 0:
 			mrm.actionReady = 1
-			mrm.bruteforceID = -1
+			mrm.dealer_bruteforceID = -1
 			mrm.wager = 70
 			var process = ProjectSettings.globalize_path("res://dealer.exe") \
 				if OS.get_name() == "Windows" else "./dealer.x86_64"
-			OS.create_process(process,[])
+			dealer_pid = OS.create_process(process,[])
 		matches_num += 1
 		mrm.beginMatch()
 	
 func eraseMatch(mrm : MRM):
-	if multiplayer.get_peers().has(mrm.bruteforceID):
-		multiplayer.multiplayer_peer.disconnect_peer(mrm.bruteforceID)
+	if mrm.dealer_bruteforceID > 0 and multiplayer.get_peers().has(mrm.dealer_bruteforceID):
+		multiplayer.multiplayer_peer.disconnect_peer(mrm.dealer_bruteforceID)
+	if mrm.dealer_pid > 0:
+		OS.kill(mrm.dealer_pid)
 	mrm.queue_free()
 	matches_num -= 1
 
@@ -207,6 +206,12 @@ func pickItems():
 				newAmt -= 1
 				itemAmounts_available[i][item_onTable] = newAmt
 		for j in range(min(numItems, 8-num_itemsOnTable)):
+			if loadIdx == 0 and health <= 4:
+					if itemsForPlayers[i].has("handcuffs") \
+						and itemsForPlayers[i].has("handsaw"):
+						itemAmounts_available[i]["handsaw"] = 0
+					elif itemsForPlayers[i].count("handsaw") > 1:
+						itemAmounts_available[i]["handcuffs"] = 0
 			var availableItemArray = []
 			for item_available in itemAmounts_available[i]:
 				if itemAmounts_available[i][item_available] > 0:
@@ -405,9 +410,6 @@ func doItem(action_temp, playerIdx):
 	var action = itemsOnTable[playerIdx][int(action_temp)]
 	itemsOnTable[playerIdx][int(action_temp)] = ""
 	if dealer: dealer_table[playerIdx].erase(action)
-	var newAmt = itemAmounts_available[playerIdx][action]
-	newAmt += 1
-	itemAmounts_available[playerIdx][action] = newAmt
 
 @rpc("any_peer", "reliable")
 func sendActionValidation(_action, _result): pass
@@ -504,7 +506,7 @@ func dealer_action_send():
 	var s = [isHandcuffed[1], magnifyingGlassResult, isSawed, \
 			isStealing, lives - livesUnknown, blanks - blanksUnknown]
 	print("sending bruteforce request")
-	get_parent().sendBruteforce.rpc_id(bruteforceID, 0, lives, blanks, d, p, s)
+	get_parent().sendBruteforce.rpc_id(dealer_bruteforceID, 0, lives, blanks, d, p, s)
 
 func dealer_action_do(option):
 	await get_tree().create_timer(0.7).timeout
@@ -547,7 +549,7 @@ func receiveBruteforce(option):
 	var id = multiplayer.get_remote_sender_id()
 	var mrm = null
 	for child in get_children():
-		if child.bruteforceID == id:
+		if child.dealer_bruteforceID == id:
 			mrm = child
 			break
 	if mrm != null:

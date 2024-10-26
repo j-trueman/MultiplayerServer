@@ -30,6 +30,9 @@ class Invite:
 		
 	func cancel():
 		MultiplayerManager.receiveInviteStatus.rpc_id(inviteTo, inviteFromUsername, "cancel")
+		
+	func busy():
+		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteToUsername, "busy")
 	
 func getInboundInvites(to):
 	var invitesForPlayer = []
@@ -49,8 +52,12 @@ func acceptInvite(from, to):
 	for invite in activeInvites:
 		if invite.inviteFrom == from && invite.inviteTo == to:
 			invite.accept()
-			activeInvites.remove_at(activeInvites.find(invite))
+			activeInvites.erase(invite)
 			retractAllInvites(from)
+			for inboundInvite in activeInvites:
+				if (inboundInvite.inviteTo == from) or (inboundInvite.inviteTo == to):
+					inboundInvite.busy()
+					activeInvites.erase(inboundInvite)
 			return true
 	return false
 
@@ -58,7 +65,7 @@ func denyInvite(from):
 	for invite in activeInvites:
 		if invite.inviteFrom == from:
 			invite.deny()
-			activeInvites.remove_at(activeInvites.find(invite))
+			activeInvites.erase(invite)
 			return true
 	return false
 
@@ -66,7 +73,7 @@ func retractInvite(from, to):
 	for invite in activeInvites:
 		if invite.inviteFrom == from && invite.inviteTo == to:
 			invite.cancel()
-			activeInvites.remove_at(activeInvites.find(invite))
+			activeInvites.erase(invite)
 			return true
 	return false
 
@@ -75,4 +82,4 @@ func retractAllInvites(from, dual = false):
 		if invite.inviteFrom == from or (dual and invite.inviteTo == from):
 			if AuthManager.loggedInPlayers.has(invite.inviteTo):
 				invite.cancel()
-			activeInvites.remove_at(activeInvites.find(invite))
+			activeInvites.erase(invite)
