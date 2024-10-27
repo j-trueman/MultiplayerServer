@@ -23,6 +23,10 @@ class Invite:
 	
 	func accept():
 		MultiplayerManager.receiveInviteStatus.rpc_id(inviteFrom, inviteToUsername, "accept")
+		var toMatch = MultiplayerManager.mrm.getMatch(inviteTo)
+		if toMatch:
+			if toMatch.dealer:
+				MultiplayerManager.mrm.eraseMatch(toMatch)
 		MultiplayerManager.mrm.createMatch([inviteFrom, inviteTo])
 		
 	func deny():

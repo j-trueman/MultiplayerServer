@@ -28,6 +28,7 @@ var itemAmountsArray = [
 ]
 var itemAmounts = {}
 
+var matchID
 var players = []
 var scores
 var currentPlayerTurn
@@ -107,7 +108,7 @@ func getMatch(id):
 func createMatch(players_forMatch):
 	if not (getMatch(players_forMatch.front()) or getMatch(players_forMatch.back())):
 		var mrm = MRM.new()
-		mrm.name = "Match " + str(matches_num)
+		mrm.matchID = matches_num
 		if players_forMatch.has(0):
 			mrm.dealer = true
 		else:
@@ -128,10 +129,8 @@ func createMatch(players_forMatch):
 func eraseMatch(mrm : MRM):
 	if mrm.dealer_bruteforceID > 0 and multiplayer.get_peers().has(mrm.dealer_bruteforceID):
 		multiplayer.multiplayer_peer.disconnect_peer(mrm.dealer_bruteforceID)
-	if mrm.dealer_pid > 0:
-		OS.kill(mrm.dealer_pid)
+	remove_child(mrm)
 	mrm.queue_free()
-	matches_num -= 1
 
 @rpc("any_peer", "reliable")
 func receivePlayerInfo():
