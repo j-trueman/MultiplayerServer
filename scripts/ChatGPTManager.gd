@@ -52,7 +52,6 @@ func initDB():
 	else:
 		intro = prompt
 	promptFile.close()
-	print(intro)
 
 func moderate(input):
 	var json = JSON.stringify({"input": input})

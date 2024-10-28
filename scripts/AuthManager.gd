@@ -22,12 +22,13 @@ func _ready():
 		}
 		database.create_table("users", table)
 	
-	var dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.WRITE_READ)
-	if !dealerKeyFile:
+	var dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.READ_WRITE)
+	if dealerKeyFile == null:
+		dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.WRITE_READ)
+	dealerKey = dealerKeyFile.get_buffer(dealerKeyFile.get_length())
+	if dealerKey.is_empty():
 		dealerKey = crypto.generate_rsa(4096)
 		dealerKeyFile.store_string(dealerKey.save_to_string())
-	else:
-		dealerKey = dealerKeyFile.get_buffer(dealerKeyFile.get_length())
 	dealerKeyFile.close()
 
 func _CreateNewUser(username : String):
