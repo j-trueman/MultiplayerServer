@@ -71,6 +71,7 @@ var dealer_wait = 2
 var dealer_end = 0
 var dealer_table
 var dealer_bruteforceID = 0
+var dealer_isInverted = false
 
 var dealerChat_history = []
 var dealerChat_busy = false
@@ -323,7 +324,9 @@ func doAction(action, action_temp, playerIdx):
 				if shellArray.is_empty(): isHandcuffed[opponentIdx] = 0
 				elif shell == 1: isHandcuffed[opponentIdx] -= 1
 			isSawed = false
-			if dealer: dealer_knownShells.pop_front()
+			if dealer:
+				dealer_isInverted = false
+				dealer_knownShells.pop_front()
 		"shoot opponent":
 			dealer_shotgunFlag = true
 			var shell = shellArray.pop_front()
@@ -337,7 +340,9 @@ func doAction(action, action_temp, playerIdx):
 				if shellArray.is_empty(): isHandcuffed[opponentIdx] = 0
 				else: isHandcuffed[opponentIdx] -= 1
 			isSawed = false
-			if dealer: dealer_knownShells.pop_front()
+			if dealer:
+				dealer_isInverted = false
+				dealer_knownShells.pop_front()
 		"handsaw":
 			doItem(action_temp, playerIdx)
 			isSawed = true
@@ -351,7 +356,9 @@ func doAction(action, action_temp, playerIdx):
 			result = shellArray.pop_front()
 			if shellArray.is_empty():
 				currentPlayerTurn = int(not playerIdx)
-			if dealer: dealer_knownShells.pop_front()
+			if dealer:
+				dealer_isInverted = false
+				dealer_knownShells.pop_front()
 		"cigarettes":
 			doItem(action_temp, playerIdx)
 			healthPlayers[playerIdx] = min(health, healthPlayers[playerIdx] + 1)
@@ -380,6 +387,8 @@ func doAction(action, action_temp, playerIdx):
 		"inverter":
 			doItem(action_temp, playerIdx)
 			shellArray[0] = int(not shellArray[0])
+			if dealer:
+				dealer_isInverted = not dealer_isInverted
 	var roundOver = false
 	var winner
 	for i in range(2):
@@ -587,10 +596,18 @@ func dealerChat(message):
 			if vibeCheck:
 				var knownShell = ("is " + "Live" if bool(shellArray.front()) else "Blank") \
 					if dealer_knownShells.front() else "?"
+				var liveCount
+				var blankCount
+				if dealer_isInverted and not (dealer_knownShells.front() and currentPlayerTurn == 0):
+					liveCount = "?"
+					blankCount = "?"
+				else:
+					liveCount = str(shellArray.count(1))
+					blankCount = str(shellArray.count(0))
 				var turn = "player's turn" if bool(currentPlayerTurn) else "Dealer's turn"
 				var status = "[Dealer " + str(healthPlayers.front()) + "/Player " + \
-					str(healthPlayers.back()) + ", Live " + str(shellArray.count(1)) + \
-					"/Blank " + str(shellArray.count(0)) + ", " + knownShell + ", " + turn + "]"
+					str(healthPlayers.back()) + ", Live " + liveCount + \
+					"/Blank " + blankCount + ", " + knownShell + ", " + turn + "]"
 				while dealerChat_history.size() > 18:
 					dealerChat_history.pop_front()
 				var dealerChat_toSubmit = dealerChat_history.duplicate(true)
