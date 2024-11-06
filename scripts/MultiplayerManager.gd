@@ -3,7 +3,7 @@ extends Node
 const SCORE_MAX = 999999999999
 const VERSION = "0.4.0"
 var port = 2095
-var maxClients = 1000
+var maxClients = 4095
 var dealerMode = true
 var chatgptMode = false
 

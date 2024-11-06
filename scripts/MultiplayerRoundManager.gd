@@ -596,18 +596,18 @@ func dealerChat(message):
 			if vibeCheck:
 				var knownShell = ("is " + "Live" if bool(shellArray.front()) else "Blank") \
 					if dealer_knownShells.front() else "?"
-				var liveCount
-				var blankCount
+				var localLiveCount
+				var localBlankCount
 				if dealer_isInverted and not (dealer_knownShells.front() and currentPlayerTurn == 0):
-					liveCount = "?"
-					blankCount = "?"
+					localLiveCount = "?"
+					localBlankCount = "?"
 				else:
-					liveCount = str(shellArray.count(1))
-					blankCount = str(shellArray.count(0))
+					localLiveCount = str(shellArray.count(1))
+					localBlankCount = str(shellArray.count(0))
 				var turn = "player's turn" if bool(currentPlayerTurn) else "Dealer's turn"
 				var status = "[Dealer " + str(healthPlayers.front()) + "/Player " + \
-					str(healthPlayers.back()) + ", Live " + liveCount + \
-					"/Blank " + blankCount + ", " + knownShell + ", " + turn + "]"
+					str(healthPlayers.back()) + ", Live " + localLiveCount + \
+					"/Blank " + localBlankCount + ", " + knownShell + ", " + turn + "]"
 				while dealerChat_history.size() > 18:
 					dealerChat_history.pop_front()
 				var dealerChat_toSubmit = dealerChat_history.duplicate(true)

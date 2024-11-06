@@ -14,3 +14,6 @@ libgdsqlite.windows.template_release.x86_64.dll
 server.properties
 chat.db
 prompt.txt
+dealerkey.key
+dealer.exe
+dealer.x86_64
