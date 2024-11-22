@@ -1,7 +1,7 @@
 extends Node
 
 const SCORE_MAX = 999999999999
-const VERSION = "0.4.1"
+const VERSION = "0.4.2"
 var port = 2095
 var maxClients = 4095
 var dealerMode = true

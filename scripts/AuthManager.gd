@@ -25,10 +25,10 @@ func _ready():
 	var dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.READ_WRITE)
 	if dealerKeyFile == null:
 		dealerKeyFile = FileAccess.open("res://dealerkey.key", FileAccess.WRITE_READ)
-	dealerKey = dealerKeyFile.get_buffer(dealerKeyFile.get_length())
+	dealerKey = FileAccess.get_file_as_string("res://dealerkey.key")
 	if dealerKey.is_empty():
-		dealerKey = crypto.generate_rsa(4096)
-		dealerKeyFile.store_string(dealerKey.save_to_string())
+		dealerKeyFile.store_string(crypto.generate_rsa(4096).save_to_string())
+		dealerKey = FileAccess.get_file_as_string("res://dealerkey.key")
 	dealerKeyFile.close()
 
 func _CreateNewUser(username : String):
